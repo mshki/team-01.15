@@ -29,14 +29,12 @@ model Event {
   title       String
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
-  description EventDesc?
   attendees   EventAttendee[]
 }
 
 model EventDesc {
   id        Int         @id @default(autoincrement())
   eventId   Int         @unique
-  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   title     String
   desc      String
   location  String
@@ -59,4 +57,5 @@ model EventAttendee {
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([eventId, userId])
+  @@unique([eventId, userId])
 }
