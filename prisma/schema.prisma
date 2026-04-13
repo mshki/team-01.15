@@ -30,6 +30,7 @@ model Event {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   attendees   EventAttendee[]
+  eventDesc   EventDesc?
 }
 
 model EventDesc {
@@ -45,6 +46,7 @@ model EventDesc {
   status    EventStatus @default(DRAFT)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }
 
 model EventAttendee {
