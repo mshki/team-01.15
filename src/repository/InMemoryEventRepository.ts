@@ -83,18 +83,16 @@ class InMemoryEventRepository implements IEventRepository {
       ...existing,
       ...event,
       attendees: event.attendees ?? existing.attendees,
-      eventDesc: event.eventDesc
-        ? {
-            ...existing.eventDesc,
-            ...event.eventDesc,
-            updatedAt: new Date(),
-          }
-        : existing.eventDesc,
+      eventDesc: {
+        ...existing.eventDesc,
+        ...(event.eventDesc ?? {}),
+        updatedAt: new Date(),
+      },
     };
 
-    events.set(id, updated);
-    return Ok(updated);
-  }
+  events.set(id, updated);
+  return Ok(updated);
+}
 
   async deleteEvent(id: string): Promise<Result<void, EventError>> {
     const existing = events.get(id);
