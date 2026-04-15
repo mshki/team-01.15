@@ -37,7 +37,6 @@ class ExpressApp implements IApp {
   constructor(
     private readonly controller: IEventController,
     private readonly authController: IAuthController,
-    private readonly eventController: IEventController,
     private readonly logger: ILoggingService,
   ) {
     this.app = express();
@@ -300,7 +299,7 @@ class ExpressApp implements IApp {
         if (!this.requireAuthenticated(req, res)) {
           return;
         }
-        await this.eventController.showEventForm(res);
+        await this.controller.showEventForm(res);
       }),
     );
 
@@ -310,7 +309,7 @@ class ExpressApp implements IApp {
         if (!this.requireAuthenticated(req, res)) {
           return;
         }
-        await this.eventController.showEventDetails(res, typeof req.params.id === "string" ? req.params.id : "");
+        await this.controller.showEventDetails(res, typeof req.params.id === "string" ? req.params.id : "");
       }),
     );
 
@@ -320,7 +319,7 @@ class ExpressApp implements IApp {
         if (!this.requireAuthenticated(req, res)) {
           return;
         }
-        await this.eventController.newEventFromForm(res, {
+        await this.controller.newEventFromForm(res, {
           name: typeof req.body.name === "string" ? req.body.name : "",
           description: typeof req.body.description === "string" ? req.body.description : "",
           location: typeof req.body.location === "string" ? req.body.location : "",
@@ -337,9 +336,9 @@ class ExpressApp implements IApp {
 }
 
 export function CreateApp(
+  controller: IEventController,
   authController: IAuthController,
-  eventController: IEventController,
   logger: ILoggingService,
 ): IApp {
-  return new ExpressApp(authController, eventController, logger);
+  return new ExpressApp(controller, authController, logger);
 }

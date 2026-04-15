@@ -19,5 +19,5 @@ export function createComposedApp(eventController: IEventController, logger?: IL
   const adminUserService = CreateAdminUserService(authUsers, passwordHasher);
   const authController = CreateAuthController(authService, adminUserService, resolvedLogger);
 
-  return CreateApp(authController, eventController, resolvedLogger);
+  return CreateApp(eventController, authController, resolvedLogger);
 }

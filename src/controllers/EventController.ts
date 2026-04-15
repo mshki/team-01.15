@@ -29,6 +29,8 @@ class EventController implements IEventController {
 
     async showEventDetails(res: Response, eventId: string): Promise<void> {
         return;
+    }
+    
     async editFromForm(res: Response, id: number, session: IAppBrowserSession): Promise<void> {
         // TODO
     }
