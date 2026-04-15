@@ -1,20 +1,17 @@
 import type { Response } from "express";
 import { IEventService } from "../service/EventService";
 import { ILoggingService } from "../service/LoggingService";
-import { IAppBrowserSession } from "../session/AppSession";
+import { IAppBrowserSession, IAuthenticatedUserSession } from "../session/AppSession";
+import { EventError } from "../lib/errors";
 
 export interface IEventController {
-    // TODO: verify session is correct
-    verifyIsOwner(res: Response, event_id: number, organizerId: string, session: IAppBrowserSession): Promise<boolean>;
-    editFromForm(res: Response, id: number, session: IAppBrowserSession): Promise<void>;
+    editFromForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void>;
 }
 
 class EventController implements IEventController {
     constructor(private readonly eventService: IEventService, private readonly logger: ILoggingService) {}
-    async verifyIsOwner(res: Response, event_id: number, organizerId: string, session: IAppBrowserSession): Promise<void> {
-        // TODO
-    }
-    async editFromForm(res: Response, id: number, session: IAppBrowserSession): Promise<void> {
+
+    async editFromForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
         // TODO
     }
     

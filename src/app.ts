@@ -18,6 +18,7 @@ import {
   touchAppSession,
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
+import { IEvent } from "./types/EventTypes";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -128,8 +129,6 @@ class ExpressApp implements IApp {
     });
     return false;
   }
-
-  private
 
   private registerRoutes(): void {
     // ── Public routes ────────────────────────────────────────────────
@@ -279,24 +278,15 @@ class ExpressApp implements IApp {
 
         const browserSession = touchAppSession(sessionStore(req));
         const currentUser = getAuthenticatedUser(sessionStore(req));
-        // 1. verify user is authenticated 
+
         if (!currentUser) {
           res.status(401).render("partials/error", {
             message: AuthenticationRequired("Please log in to continue.").message,
             layout: false,
           });
           return;
-        } 
-        // 2. verify user is admin or event owner
-        const isOwner = await this.controller.verifyIsOwner(res, id, currentUser.userId, browserSession); 
-        if (currentUser.role == "admin" || isOwner) {
-          await this.controller.editFromForm(res, id, browserSession);
         } else {
-          res.status(403).render("partials/error", {
-            message: AuthorizationRequired("User does not have access to editing this event.").message,
-            layout: false,
-          });
-          return;
+          await this.controller.editFromForm(res, id, currentUser, browserSession);
         }
       }),
     )
