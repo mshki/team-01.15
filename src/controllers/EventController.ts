@@ -10,6 +10,7 @@ export interface IEventController {
             location: string,
             datetime: string,
             capacity: number}): Promise<void>;
+    showEventDetails(res: Response, eventId: string): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -20,6 +21,10 @@ class EventController implements IEventController {
     }
 
     async newEventFromForm(res: Response, form: {name: string; description: string; location: string; datetime: string; capacity: number}): Promise<void> {
+        return;
+    }
+
+    async showEventDetails(res: Response, eventId: string): Promise<void> {
         return;
     }
 }
