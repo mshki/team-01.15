@@ -21,7 +21,7 @@ export function createComposedApp(logger?: ILoggingService): IApp {
     const adminUserService = CreateAdminUserService(authUsers, passwordHasher);
     const authController = CreateAuthController(authService, adminUserService, resolvedLogger);
 
-    // Event & waitlist wiring
+    // Event & waitlist wiring new make
     const eventRepo = createInMemoryEventRepository();
     const rsvpRepo = createRSVPRepository();
     const waitlistService = createWaitlistService(rsvpRepo, eventRepo);
