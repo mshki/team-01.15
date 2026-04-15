@@ -3,6 +3,7 @@ import express, { Request, RequestHandler, Response } from "express";
 import session from "express-session";
 import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
+import { IEventController } from "./controllers/EventController";
 import {
   AuthenticationRequired,
   AuthorizationRequired,
@@ -35,6 +36,7 @@ class ExpressApp implements IApp {
 
   constructor(
     private readonly authController: IAuthController,
+    private readonly eventController: IEventController,
     private readonly logger: ILoggingService,
   ) {
     this.app = express();
@@ -263,6 +265,34 @@ class ExpressApp implements IApp {
         layout: false,
       });
     });
+
+    // Event Creation Routes
+
+    this.app.get(
+      "/events/new",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+        await this.eventController.showEventForm(res);
+      }),
+    );
+
+    this.app.post(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+        await this.eventController.newEventFromForm(res, {
+          name: typeof req.body.name === "string" ? req.body.name : "",
+          description: typeof req.body.description === "string" ? req.body.description : "",
+          location: typeof req.body.location === "string" ? req.body.location : "",
+          datetime: typeof req.body.datetime === "string" ? req.body.datetime : "",
+          capacity: typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
+        });
+      }),
+    );
   }
 
   getExpressApp(): express.Express {
@@ -272,7 +302,8 @@ class ExpressApp implements IApp {
 
 export function CreateApp(
   authController: IAuthController,
+  eventController: IEventController,
   logger: ILoggingService,
 ): IApp {
-  return new ExpressApp(authController, logger);
+  return new ExpressApp(authController, eventController, logger);
 }
