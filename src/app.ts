@@ -35,6 +35,7 @@ class ExpressApp implements IApp {
   private readonly app: express.Express;
 
   constructor(
+    private readonly controller: IEventController,
     private readonly authController: IAuthController,
     private readonly eventController: IEventController,
     private readonly logger: ILoggingService,
@@ -254,6 +255,31 @@ class ExpressApp implements IApp {
         res.render("home", { session: browserSession, pageError: null });
       }),
     );
+
+    // —— Event Editing ————————————————————————————————————————————————
+
+    this.app.get(
+      "/events/:id/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        // TODO: verify correct session
+        const browserSession = touchAppSession(sessionStore(req));
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+          // TODO: partials/error needs to be added
+          res.status(400).render("events/partials/error", {
+            message: "Invalid ID.",
+            layout: false,
+          });
+          return;
+        }
+
+        await this.controller.editFromForm(res, id, browserSession);
+      }),
+    )
 
     // ── Error handler ────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { IEventService } from "../service/EventService";
 import { ILoggingService } from "../service/LoggingService";
+import { IAppBrowserSession } from "../session/AppSession";
 
 export interface IEventController {
     showEventForm(res: Response): Promise<void>;
@@ -11,6 +12,8 @@ export interface IEventController {
             datetime: string,
             capacity: number}): Promise<void>;
     showEventDetails(res: Response, eventId: string): Promise<void>;
+    // TODO: verify session is correct
+    editFromForm(res: Response, id: number, session: IAppBrowserSession): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -26,6 +29,8 @@ class EventController implements IEventController {
 
     async showEventDetails(res: Response, eventId: string): Promise<void> {
         return;
+    async editFromForm(res: Response, id: number, session: IAppBrowserSession): Promise<void> {
+        // TODO
     }
 }
 
