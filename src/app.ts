@@ -3,7 +3,7 @@ import express, { Request, RequestHandler, Response } from "express";
 import session from "express-session";
 import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
-import { IEventController } from "./controllers/EventController.ts";
+import { IEventController } from "./controllers/EventController";
 import {
   AuthenticationRequired,
   AuthorizationRequired,
@@ -128,6 +128,8 @@ class ExpressApp implements IApp {
     });
     return false;
   }
+
+  private
 
   private registerRoutes(): void {
     // ── Public routes ────────────────────────────────────────────────
@@ -255,7 +257,7 @@ class ExpressApp implements IApp {
       }),
     );
 
-    // —— Event Editing ————————————————————————————————————————————————
+    // —— Feature 3: Event Editing ————————————————————————————————————————————————
 
     this.app.get(
       "/events/:id/edit",
@@ -264,8 +266,7 @@ class ExpressApp implements IApp {
           return;
         }
 
-        // TODO: verify correct session
-        const browserSession = touchAppSession(sessionStore(req));
+        // check event exists
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
           // TODO: partials/error needs to be added
@@ -274,9 +275,29 @@ class ExpressApp implements IApp {
             layout: false,
           });
           return;
-        }
+        } 
 
-        await this.controller.editFromForm(res, id, browserSession);
+        const browserSession = touchAppSession(sessionStore(req));
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+        // 1. verify user is authenticated 
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        } 
+        // 2. verify user is admin or event owner
+        const isOwner = await this.controller.verifyIsOwner(res, id, currentUser.userId, browserSession); 
+        if (currentUser.role == "admin" || isOwner) {
+          await this.controller.editFromForm(res, id, browserSession);
+        } else {
+          res.status(403).render("partials/error", {
+            message: AuthorizationRequired("User does not have access to editing this event.").message,
+            layout: false,
+          });
+          return;
+        }
       }),
     )
 
