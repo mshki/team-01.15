@@ -4,14 +4,16 @@ import { ILoggingService } from "../service/LoggingService";
 import { IAppBrowserSession } from "../session/AppSession";
 
 export interface IEventController {
-    showEventForm(res: Response): Promise<void>;
+    showEventForm(res: Response, session: IAppBrowserSession): Promise<void>;
     newEventFromForm(res: Response, 
-        form: {name: string,
-            description: string,
-            location: string,
-            datetime: string,
-            capacity: number}): Promise<void>;
-    showEventDetails(res: Response, eventId: string): Promise<void>;
+        name: string,
+        description: string,
+        location: string,
+        datetime: string,
+        capacity: number,
+        session: IAppBrowserSession
+    ): Promise<void>;
+    showEventDetails(res: Response, eventId: string, session: IAppBrowserSession): Promise<void>;
     // TODO: verify session is correct
     editFromForm(res: Response, id: number, session: IAppBrowserSession): Promise<void>;
 }
@@ -19,18 +21,25 @@ export interface IEventController {
 class EventController implements IEventController {
     constructor(private readonly eventService: IEventService, private readonly logger: ILoggingService) {}
 
-    async showEventForm(res: Response): Promise<void> {
+    async showEventForm(res: Response, session: IAppBrowserSession): Promise<void> {
         return;
     }
 
-    async newEventFromForm(res: Response, form: {name: string; description: string; location: string; datetime: string; capacity: number}): Promise<void> {
+    async newEventFromForm(res: Response, 
+        name: string,
+        description: string,
+        location: string,
+        datetime: string,
+        capacity: number,
+        session: IAppBrowserSession
+    ): Promise<void> {
         return;
     }
 
-    async showEventDetails(res: Response, eventId: string): Promise<void> {
+    async showEventDetails(res: Response, eventId: string, session: IAppBrowserSession): Promise<void> {
         return;
     }
-    
+
     async editFromForm(res: Response, id: number, session: IAppBrowserSession): Promise<void> {
         // TODO
     }

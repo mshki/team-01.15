@@ -299,7 +299,8 @@ class ExpressApp implements IApp {
         if (!this.requireAuthenticated(req, res)) {
           return;
         }
-        await this.controller.showEventForm(res);
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.showEventForm(res, browserSession);
       }),
     );
 
@@ -309,7 +310,10 @@ class ExpressApp implements IApp {
         if (!this.requireAuthenticated(req, res)) {
           return;
         }
-        await this.controller.showEventDetails(res, typeof req.params.id === "string" ? req.params.id : "");
+
+        const browserSession = touchAppSession(sessionStore(req));
+
+        await this.controller.showEventDetails(res, typeof req.params.id === "string" ? req.params.id : "", browserSession);
       }),
     );
 
@@ -319,13 +323,16 @@ class ExpressApp implements IApp {
         if (!this.requireAuthenticated(req, res)) {
           return;
         }
-        await this.controller.newEventFromForm(res, {
-          name: typeof req.body.name === "string" ? req.body.name : "",
-          description: typeof req.body.description === "string" ? req.body.description : "",
-          location: typeof req.body.location === "string" ? req.body.location : "",
-          datetime: typeof req.body.datetime === "string" ? req.body.datetime : "",
-          capacity: typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
-        });
+
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.newEventFromForm(res, 
+          typeof req.body.name === "string" ? req.body.name : "",
+          typeof req.body.description === "string" ? req.body.description : "",
+          typeof req.body.location === "string" ? req.body.location : "",
+          typeof req.body.datetime === "string" ? req.body.datetime : "",
+          typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
+          browserSession
+        );
       }),
     );
   }
