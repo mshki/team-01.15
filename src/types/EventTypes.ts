@@ -39,3 +39,4 @@ export interface IEvent {
     eventDesc: IEventDesc,
 }
 
+// Creating a RSVPrepository for the waitlist repo since that works hand in hand with the repository and that it relies heavy on eventtypes to get the strucutre 
