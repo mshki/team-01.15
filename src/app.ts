@@ -17,6 +17,7 @@ import {
   touchAppSession,
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
+import { IWaitlistService } from "./service/WaitlistService";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -36,6 +37,7 @@ class ExpressApp implements IApp {
   constructor(
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
+    private readonly waitlistService: IWaitlistService,
   ) {
     this.app = express();
     this.registerMiddleware();
@@ -169,6 +171,82 @@ class ExpressApp implements IApp {
         await this.authController.logoutFromForm(res, sessionStore(req));
       }),
     );
+  // ── Feature 9: Waitlist Promotion ────────────────────────────────────────────
+
+// POST /events/:eventId/rsvp/cancel
+// Cancels the authenticated user's RSVP and promotes the next waitlisted member.
+this.app.post(
+    "/events/:eventId/rsvp/cancel",
+    asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) return;
+
+        const store = sessionStore(req);
+        const user = getAuthenticatedUser(store);
+        if (!user) return;
+
+        const eventId = parseInt(req.params.eventId);
+        if (isNaN(eventId)) {
+            res.status(400).render("partials/error", {
+                message: "Invalid event ID.",
+                layout: false,
+            });
+            return;
+        }
+
+        const result = await this.waitlistService.cancelAndPromote(eventId, user.userId);
+
+        if (!result.ok) {
+            res.status(400).render("partials/error", {
+                message: result.error.message,
+                layout: false,
+            });
+            return;
+        }
+
+        res.redirect(`/events/${eventId}`);
+    }),
+);
+
+// GET /events/:eventId/waitlist-status
+// Shows the authenticated user's RSVP status and queue position for an event.
+this.app.get(
+    "/events/:eventId/waitlist-status",
+    asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) return;
+
+        const store = sessionStore(req);
+        const user = getAuthenticatedUser(store);
+        if (!user) return;
+
+        const eventId = parseInt(req.params.eventId);
+        if (isNaN(eventId)) {
+            res.status(400).render("partials/error", {
+                message: "Invalid event ID.",
+                layout: false,
+            });
+            return;
+        }
+
+        const result = await this.waitlistService.getWaitlistStatus(eventId, user.userId);
+
+        if (!result.ok) {
+            res.status(400).render("partials/error", {
+                message: result.error.message,
+                layout: false,
+            });
+            return;
+        }
+
+        const browserSession = recordPageView(store);
+        res.render("waitlist-status", {
+            session: browserSession,
+            eventId,
+            rsvpStatus: result.value.rsvpStatus,
+            queuePosition: result.value.queuePosition,
+        });
+    }),
+);
+  
 
     // ── Admin routes ─────────────────────────────────────────────────
 
@@ -273,6 +351,7 @@ class ExpressApp implements IApp {
 export function CreateApp(
   authController: IAuthController,
   logger: ILoggingService,
+  waitlistService: IWaitlistService,
 ): IApp {
-  return new ExpressApp(authController, logger);
+  return new ExpressApp(authController, logger, waitlistService);
 }
