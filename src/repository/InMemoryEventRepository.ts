@@ -43,36 +43,6 @@ class InMemoryEventRepository implements IEventRepository {
         this.events.delete(id);
         return Ok(undefined);
     }
-    async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
-    try {
-        const all = Array.from(events.values());
-        if (query.trim() === '') {
-            const now = new Date();
-            const results = all.filter(e =>
-                e.eventDesc.status === 'PUBLISHED' &&
-                e.eventDesc.datetime > now
-            );
-            return Ok(results);
-        }
-        const q = query.trim().toLowerCase();
-        const now = new Date();
-        const results = all.filter(e => {
-            if (e.eventDesc.status !== 'PUBLISHED') return false;
-            if (e.eventDesc.datetime <= now) return false;
-
-            return (
-                e.eventDesc.title.toLowerCase().includes(q) ||
-                e.eventDesc.desc.toLowerCase().includes(q) ||
-                e.eventDesc.location.toLowerCase().includes(q) ||
-                e.eventDesc.category.toLowerCase().includes(q)
-            );
-        });
-
-        return Ok(results);
-    } catch (e) {
-        return Err(DatabaseError(String(e)));
-    }
-}
 }
 
 export function createInMemoryEventRepository(): IEventRepository {

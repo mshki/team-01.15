@@ -11,5 +11,4 @@ export interface IEventRepository {
     createEvent(event: CreateEventData): Promise<Result<IEvent, EventError>>;
     updateEvent(id: number, event: Partial<IEvent>): Promise<Result<IEvent, EventError>>;
     deleteEvent(id: number): Promise<Result<void, EventError>>;
-    searchEvents(query: string): Promise<Result<IEvent[], EventError>>;
 }
