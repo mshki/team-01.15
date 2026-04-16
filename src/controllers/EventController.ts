@@ -5,29 +5,43 @@ import { IAppBrowserSession, IAuthenticatedUserSession } from "../session/AppSes
 import { EventError } from "../lib/errors";
 
 export interface IEventController {
-    editFromForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void>;
+    showEventForm(res: Response, session: IAppBrowserSession): Promise<void>;
+    newEventFromForm(res: Response, 
+        name: string,
+        description: string,
+        location: string,
+        datetime: string,
+        capacity: number,
+        session: IAppBrowserSession
+    ): Promise<void>;
+    showEventDetails(res: Response, eventId: string, session: IAppBrowserSession): Promise<void>;
+    // TODO: verify session is correct
+    editFromForm(res: Response, id: number, session: IAppBrowserSession): Promise<void>;
 }
 
 class EventController implements IEventController {
     constructor(private readonly eventService: IEventService, private readonly logger: ILoggingService) {}
-    
-    private isEventError(value: unknown): value is EventError {
-        return (
-            typeof value === "object" &&
-            value !== null &&
-            "name" in value &&
-            "message" in value
-        );
+
+    async showEventForm(res: Response, session: IAppBrowserSession): Promise<void> {
+        return;
     }
 
-    private mapErrorStatus(error: EventError): number {
-        // TODO: verify mapping
-        if (error.name === "EventNotFoundError") return 404;
-        if (error.name === "ValidationError") return 400;
-        return 500;
+    async newEventFromForm(res: Response, 
+        name: string,
+        description: string,
+        location: string,
+        datetime: string,
+        capacity: number,
+        session: IAppBrowserSession
+    ): Promise<void> {
+        return;
     }
-    
-    async editFromForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
+
+    async showEventDetails(res: Response, eventId: string, session: IAppBrowserSession): Promise<void> {
+        return;
+    }
+
+    async editFromForm(res: Response, id: number, session: IAppBrowserSession): Promise<void> {
         // TODO
     }
     
