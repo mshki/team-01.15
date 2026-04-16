@@ -36,6 +36,9 @@ export interface IEventController {
         user: IAuthenticatedUserSession,
         session: IAppBrowserSession
         ): Promise<void>;
+    
+    publishFromForm(res: Response, eventId: number, userId: string): Promise<void>;
+    cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -213,6 +216,38 @@ class EventController implements IEventController {
         }
     
         res.redirect(`/events/${eventId}`);
+    }
+    async publishFromForm(res: Response, eventId: number, userId: string): Promise<void> {
+        this.logger.info(`POST publish event ${eventId} by user ${userId}`);
+
+        const result = await this.eventService.publishEvent(eventId, userId);
+
+        if (!result.ok) {
+           res.status(400).render("partials/error", {
+               message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        res.redirect(`/events/${eventId}`);
+
+    }
+    async cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void> {
+        this.logger.info(`POST cancel event ${eventId} by user ${userId}`);
+
+        const result = await this.eventService.cancelEvent(eventId, userId, isAdmin);
+
+        if (!result.ok) {
+            res.status(400).render("partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        res.redirect(`/events/${eventId}`);
+
     }
 }
 
