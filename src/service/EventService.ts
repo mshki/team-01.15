@@ -24,7 +24,7 @@ export interface IEventService {
     toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>>;
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
-    filterPublishedEvents(timeframe?: string): Promise<Result<IEvent[], EventError>>;
+    filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
 }
 
 class EventService implements IEventService {
@@ -271,9 +271,14 @@ class EventService implements IEventService {
 
         return updatedResult;
     }
-    
-    async filterPublishedEvents(timeframe: string = "all"): Promise<Result<IEvent[], EventError>> {
-        this.logger.info(`Filtering published events with timeframe "${timeframe}"`);
+
+    async filterPublishedEvents(
+        timeframe: string = "all",
+        category: string | null = null
+    ): Promise<Result<IEvent[], EventError>> {
+        this.logger.info(
+            `Filtering published events with timeframe "${timeframe}" and category "${category ?? "all"}"`
+        );
 
         const allEventsResult = await this.eventRepository.getAllEvents();
 
@@ -283,39 +288,45 @@ class EventService implements IEventService {
 
         const now = new Date();
 
-        const publishedUpcomingEvents = allEventsResult.value.filter(
+        let filteredEvents = allEventsResult.value.filter(
             (event) =>
                 event.status === "PUBLISHED" &&
                 event.endDatetime.getTime() >= now.getTime()
         );
 
+        if (category && category.trim() !== "") {
+            filteredEvents = filteredEvents.filter(
+                (event) => (event.category ?? "").toLowerCase() === category.toLowerCase()
+            );
+        }
+
         if (timeframe === "all") {
-            return Ok(publishedUpcomingEvents);
+            return Ok(filteredEvents);
         }
 
         if (timeframe === "week") {
             const endOfWeek = new Date(now);
             endOfWeek.setDate(now.getDate() + 7);
 
-            const filtered = publishedUpcomingEvents.filter(
-                (event) => event.startDatetime.getTime() <= endOfWeek.getTime()
+            return Ok(
+                filteredEvents.filter(
+                    (event) => event.startDatetime.getTime() <= endOfWeek.getTime()
+                )
             );
-
-            return Ok(filtered);
         }
 
         if (timeframe === "weekend") {
             const weekend = this.getUpcomingWeekendRange(now);
 
-            const filtered = publishedUpcomingEvents.filter((event) => {
-                const start = event.startDatetime.getTime();
-                return (
-                    start >= weekend.start.getTime() &&
-                    start <= weekend.end.getTime()
-                );
-            });
-
-            return Ok(filtered);
+            return Ok(
+                filteredEvents.filter((event) => {
+                    const start = event.startDatetime.getTime();
+                    return (
+                        start >= weekend.start.getTime() &&
+                        start <= weekend.end.getTime()
+                    );
+                })
+            );
         }
 
         return Err(ValidationError("Invalid timeframe filter"));
