@@ -75,6 +75,28 @@ class EventService implements IEventService {
             // TODO: verify error
           return Err(ValidationError("Cannot edit event."));
         }
+
+        if (!title) {
+            return Err(ValidationError("Title is required."));
+        }
+        if (title.length < 3) {
+            return Err(ValidationError("Title must be at least 3 characters."));
+        }
+        if (!description) {
+            return Err(ValidationError("Description is required."));
+        }
+        if (!location) {
+            return Err(ValidationError("Location is required."));
+        }
+        if (!startDatetime || !endDatetime) {
+            return Err(ValidationError("Start and end datetime are required."));
+        }
+        if (endDatetime <= startDatetime) {
+            return Err(ValidationError("End datetime must be after start datetime."));
+        }
+        if (capacity != null && capacity < 1) {
+            return Err(ValidationError("Capacity must be at least 1."));
+        }
     
         const event = eventResult.value;
         const update: IEvent = {
