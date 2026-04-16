@@ -52,6 +52,20 @@ class EventService implements IEventService {
     
         return Ok(null);
     }
+    // async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+    //     this.logger.info(`searchEvents called with query: "${query}"`);
+
+    //     const result = await this.eventRepository.searchEvents(query);
+
+    //     if (!result.ok) {
+    //         this.logger.warn(`searchEvents failed: ${result.error.message}`);
+    //         return result;
+    //     }
+
+    //     this.logger.info(`searchEvents returned ${result.value.length} results`);
+    //     return result;
+    // }
+
 
     async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
         // 1. Validate input data
@@ -106,10 +120,11 @@ class EventService implements IEventService {
         this.logger.info(`Fetch event details result for ID ${eventId}: ${result.ok ? "Success" : "Error"}`);
 
         if (!result.ok) {
-            if (result.value.name === "EventNotFoundError") {
+            const error = result.value as EventError;
+            if (error.name === "EventNotFoundError") {
                 return Err(EventNotFoundError(`Event with ID ${eventId} not found.`));
             }
-            return Err(result.value);
+            return Err(error);
         }
 
         // 3. Handle repository result and return appropriate response
@@ -255,6 +270,7 @@ class EventService implements IEventService {
 
         return updatedResult;
     }
+
 
 }
 

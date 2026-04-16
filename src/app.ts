@@ -19,6 +19,7 @@ import {
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
 import { IEvent } from "./types/EventTypes";
+import { IEventService } from "./service/EventService";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -39,6 +40,7 @@ class ExpressApp implements IApp {
     private readonly controller: IEventController,
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
+    private readonly eventService: IEventService,
   ) {
     this.app = express();
     this.registerMiddleware();
@@ -282,6 +284,7 @@ class ExpressApp implements IApp {
           typeof req.body.name === "string" ? req.body.name : "",
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
+          typeof req.body.category === "string" ? req.body.category : null,
           typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
           typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           capacityRaw,
@@ -397,6 +400,39 @@ class ExpressApp implements IApp {
         await this.controller.toggleRsvpFromForm(res, id, currentUser, browserSession);
       }),
     );
+    // ── Feature 10: Event Search ─────────────────────────────────────────────────
+
+    // GET /events/search
+    // Renders the search page. Empty query returns all published upcoming events.
+    // this.app.get(
+    //     "/events/search",
+    //     asyncHandler(async (req, res) => {
+    //         if (!this.requireAuthenticated(req, res)) return;
+
+    //         const store = sessionStore(req);
+    //         const query = typeof req.query.q === "string" ? req.query.q : "";
+
+    //         const result = await this.eventService.searchEvents(query);
+
+    //         if (!result.ok) {
+    //             res.status(500).render("partials/error", {
+    //                 message: result.error.message,
+    //                 layout: false,
+    //             });
+    //             return;
+    //         }
+
+    //         const browserSession = recordPageView(store);
+    //         res.render("event-search", {
+    //             session: browserSession,
+    //             query,
+    //             events: result.value,
+    //             pageError: null,
+    //         });
+    //     }),
+    // );
+
+ 
 
     // ── Error handler ────────────────────────────────────────────────
 
@@ -425,13 +461,10 @@ class ExpressApp implements IApp {
     this.app.get(
       "/events/:id",
       asyncHandler(async (req, res) => {
-        if (!this.requireAuthenticated(req, res)) {
-          return;
-        }
-
         const browserSession = touchAppSession(sessionStore(req));
+        const eventId = parseInt(req.params.id as string, 10);
 
-        await this.controller.showEventDetails(res, typeof req.params.id === "number" ? req.params.id : 0, browserSession);
+        await this.controller.showEventDetails(res, eventId, browserSession);
       }),
     );
 
@@ -447,10 +480,73 @@ class ExpressApp implements IApp {
           typeof req.body.name === "string" ? req.body.name : "",
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
+          typeof req.body.category === "string" ? req.body.category : null,
           typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
           typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
           browserSession
+        );
+      }),
+    );
+    this.app.post(
+      "/events/:id/publish",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+
+        const eventId = Number(req.params.id);
+        if (!Number.isInteger(eventId) || eventId <= 0) {
+          res.status(400).render("partials/error", {
+            message: "Invalid event ID.",
+            layout: false,
+          });
+          return;
+        }
+
+        await this.controller.publishFromForm(res, eventId, currentUser.userId);
+      }),
+    );
+
+    this.app.post(
+      "/events/:id/cancel",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+
+        const eventId = Number(req.params.id);
+        if (!Number.isInteger(eventId) || eventId <= 0) {
+          res.status(400).render("partials/error", {
+            message: "Invalid event ID.",
+            layout: false,
+          });
+          return;
+        }
+
+        await this.controller.cancelFromForm(
+          res,
+          eventId,
+          currentUser.userId,
+          currentUser.role === "admin",
         );
       }),
     );
@@ -465,6 +561,7 @@ export function CreateApp(
   controller: IEventController,
   authController: IAuthController,
   logger: ILoggingService,
+  eventService: IEventService,
 ): IApp {
-  return new ExpressApp(controller, authController, logger);
+  return new ExpressApp(controller, authController, logger, eventService);
 }

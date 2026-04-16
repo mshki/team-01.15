@@ -1,7 +1,7 @@
 <%
   const goingCount = event.attendees.filter(a => a.rsvpStatus === 'GOING').length;
   const isAdmin = session.authenticatedUser?.role === 'admin';
-  const isOrganizer = session.authenticatedUser?.role === 'staff' && event.organizerId === session.authenticatedUser?.userId;
+  const isOrganizer = event.organizerId === session.authenticatedUser?.userId;
   const isMember = session.authenticatedUser?.role === 'user';
   const userRsvp = session.authenticatedUser
     ? event.attendees.find(a => a.userId === session.authenticatedUser.userId) ?? null
@@ -55,7 +55,17 @@
           href="/events/<%= event.id %>/edit"
           class="px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 no-underline text-sm"
         >Edit event</a>
-        <% if (event.status !== 'CANCELLED' && event.status !== 'CONCLUDED') { %>
+
+        <% if (event.status === 'DRAFT') { %>
+          <form method="post" action="/events/<%= event.id %>/publish">
+            <button
+              type="submit"
+              class="px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 cursor-pointer text-sm"
+            >Publish event</button>
+          </form>
+        <% } %>
+
+        <% if (event.status === 'PUBLISHED') { %>
         <form method="post" action="/events/<%= event.id %>/cancel">
           <button
             type="submit"
