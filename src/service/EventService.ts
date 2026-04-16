@@ -1,15 +1,16 @@
 import { EventError, EventNotFoundError } from "../lib/errors";
 import { Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
+import { IAuthenticatedUserSession } from "../session/AppSession";
 import { IEvent } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 
 export interface IEventService {
     createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: string): Promise<Result<IEvent, EventError>>;
-    getEventEditForm(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
+    getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError>>;
     updateEvent(eventId: number, 
-        userId: string, 
+        user: IAuthenticatedUserSession, 
         title: string,
         description: string,
         location: string,
@@ -29,12 +30,12 @@ class EventService implements IEventService {
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
 
-    async getEventEditForm(eventId: number, userId: string): Promise<Result<IEvent, EventError>> {
+    async getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError>> {
         // TODO
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
 
-    async updateEvent(eventId: number, userId: string, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
+    async updateEvent(eventId: number, user: IAuthenticatedUserSession, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
         // TODO
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
