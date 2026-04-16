@@ -317,7 +317,15 @@ class EventController implements IEventController {
             `Filtering events with timeframe "${timeframe}" and category "${category ?? "all"}"`
         );
 
-        const result = await this.eventService.filterPublishedEvents(timeframe, category);
+        const normalizedTimeframe =
+            timeframe === "all" || timeframe === "week" || timeframe === "weekend"
+                ? timeframe
+                : "all";
+
+        const result = await this.eventService.filterPublishedEvents(
+            normalizedTimeframe,
+            category
+        );
 
         if (!result.ok && this.isEventError(result.value)) {
             const status = this.mapErrorStatus(result.value);
@@ -335,10 +343,10 @@ class EventController implements IEventController {
             });
             return;
         }
-
+    
         res.render("events/index", {
             events: result.value,
-            timeframe,
+            timeframe: normalizedTimeframe,
             category,
             session,
             pageError: null,
