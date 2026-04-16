@@ -19,48 +19,43 @@ Feature 10: Event search.service takes in {title, description, location, categor
 
 ## Model Contracts
 enum status {
-	DRAFT
-	PUBLISHED
-	CANCELLED
-	CONCLUDED
+'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'CONCLUDED'
 }
 
-enum rsvp {
-	YES
-	NO
-	WAITLIST 
+enum RSVPStatus {
+	'GOING' | 'WAITLISTED' | 'CANCELLED'
+}
+
+Model rsvp {
+	id: string,
+    eventId: number,
+    userId: string,
+    rsvpStatus: RSVPStatus,
+    createdAt: Date,
 }
 
 Model User {
-	id 		UUID	@id @default(UUID())
-	email		String
+	id: string,
+    email: string,
+    attendees: IRSVP[],
 }
 
 
 # For all features
 Model Event {
-	id		Int
-	title		String
-	createdAt	DateTime @default(now())
-	updatedAt	DateTime @default(now())
+	id: number;
+    title: string;
+    description: string;
+    location: string;
+    capacity: number | null;
+    status: EventStatus;
+    startDatetime: Date;
+    endDatetime: Date;
+    organizerId: string;
+    attendees: IRSVP[];
+    createdAt: Date;
+    updatedAt: Date;
 }
-
-# Feature 2, 6
-model EventDesc {
-id        	Int      @id @default(autoincrement())
-title     	String
-desc      	String
-location	String
-category 	String 
-datetime 	DateTime
-organizer 	String
-capacity 	Int
-attendees	UUID[]	
-status	   	Status 	@default(DRAFT)
-createdAt 	DateTime @default(now())
-updatedAt 	DateTime @updatedAt
-}
-
 
 
 

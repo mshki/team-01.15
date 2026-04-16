@@ -364,7 +364,7 @@ class ExpressApp implements IApp {
 
         const browserSession = touchAppSession(sessionStore(req));
 
-        await this.controller.showEventDetails(res, typeof req.params.id === "string" ? req.params.id : "", browserSession);
+        await this.controller.showEventDetails(res, typeof req.params.id === "number" ? req.params.id : 0, browserSession);
       }),
     );
 

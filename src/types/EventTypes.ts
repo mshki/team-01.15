@@ -33,7 +33,6 @@ export interface IEvent {
 }
 
 export interface CreateEventData {
-    id: number,
     title: string,
     description: string,
     location: string,

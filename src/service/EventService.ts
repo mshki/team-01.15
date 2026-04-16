@@ -6,7 +6,7 @@ import { ILoggingService } from "./LoggingService";
 
 export interface IEventService {
     createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>>;
-    getEventDetails(eventId: string): Promise<Result<IEvent, EventError>>;
+    getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
     getEventEditForm(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     updateEvent(eventId: number, 
         userId: string, 
@@ -25,7 +25,7 @@ class EventService implements IEventService {
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
 
-    async getEventDetails(eventId: string): Promise<Result<IEvent, EventError>> {
+    async getEventDetails(eventId: number): Promise<Result<IEvent, EventError>> {
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
 
