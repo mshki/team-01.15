@@ -35,12 +35,17 @@ class EventService implements IEventService {
             return Err(ValidationError("Only draft events can be published"));
         }
 
-        return this.eventRepository.updateEvent(eventId, {
+        const updatedResult = await this.eventRepository.updateEvent(eventId, {
             eventDesc: {
                 ...event.eventDesc,
                 status: "PUBLISHED",
             },
         });
+
+        if (updatedResult.ok) {
+            this.logger.info(`Event ${eventId} published successfully`);
+        }
+        return updatedResult;
     }
 
     async cancelEvent(
@@ -69,12 +74,17 @@ class EventService implements IEventService {
             return Err(ValidationError("Only published events can be cancelled"));
         }
 
-        return this.eventRepository.updateEvent(eventId, {
+        const updatedResult = await this.eventRepository.updateEvent(eventId, {
             eventDesc: {
                 ...event.eventDesc,
                 status: "CANCELLED",
             },
         });
+
+        if (updatedResult.ok) {
+            this.logger.info(`Event ${eventId} cancelled successfully`);
+        }
+        return updatedResult;
     }
 
 }
