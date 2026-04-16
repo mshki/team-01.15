@@ -4,7 +4,7 @@ import { EventError, EventNotFoundError, ValidationError } from "../lib/errors";
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
-import { CreateEventData, IEvent } from "../types/EventTypes";
+import { CreateEventData, IEvent, IRSVP } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 
 export interface IEventService {
@@ -19,6 +19,7 @@ export interface IEventService {
         startDatetime: Date,
         endDatetime: Date,
         capacity: number): Promise<Result<IEvent, EventError>>;
+    toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>>;
 }
 
 class EventService implements IEventService {
@@ -155,6 +156,11 @@ class EventService implements IEventService {
             return Err(ValidationError("Failed to update event."))
         }
         return Ok(isUpdated.value);
+    }
+
+    async toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>> {
+        // TODO
+        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
 }
 
