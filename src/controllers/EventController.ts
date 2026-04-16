@@ -41,6 +41,12 @@ class EventController implements IEventController {
             "message" in value
         );
     }
+
+    private mapErrorStatus(error: EventError): number {
+        if (error.name === "EventNotFoundError") return 404;
+        if (error.name === "ValidationError") return 400;
+        return 500;
+      }
     
     async showEventForm(res: Response, session: IAppBrowserSession): Promise<void> {
         return;
@@ -62,8 +68,35 @@ class EventController implements IEventController {
     }
 
     async getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
-        // TODO
-        return;
+        this.logger.info(`Loading edit form for event ${id}`);
+
+        const result = await this.eventService.getEventEditForm(id, user);
+
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            const log = status === 400 ? this.logger.warn : this.logger.error;
+            log.call(this.logger, `Load edit form failed: ${result.value.message}`);
+
+            res.status(status).render("events/partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("events/partials/error", {
+              message: "Unable to load event for editing.",
+              layout: false,
+            });
+            return;
+        }
+        
+        res.render("events/:id/edit", {
+            event: result.value,
+            session,
+            layout: false,
+        });
     }
 
     async editFromForm(
@@ -77,9 +110,48 @@ class EventController implements IEventController {
         endDatetime: Date, 
         capacity: number, 
         session: IAppBrowserSession): Promise<void> {
-        
-    }
+            this.logger.info(`Editing event ${id}`);
 
+        const result = await this.eventService.updateEvent(id, user, {
+            title: name,
+            description,
+            location,
+            startDatetime,
+            endDatetime,
+            capacity,
+        });
+
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            const log = status === 400 ? this.logger.warn : this.logger.error;
+            log.call(this.logger, `Edit event failed: ${result.value.message}`);
+
+            res.status(status).render("events/:id/edit", {
+            error: result.value.message,
+            values: {
+                title: name,
+                description,
+                location,
+                startDatetime,
+                endDatetime,
+                capacity,
+            },
+            session,
+            layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("events/partials/error", {
+            message: "Unable to update event.",
+            layout: false,
+            });
+            return;
+        }
+
+        res.redirect(`/events/${result.value.id}`);
+    }
 }
 
 export function createEventController(eventService: IEventService, logger: ILoggingService): IEventController {
