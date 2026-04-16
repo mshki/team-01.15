@@ -1,3 +1,4 @@
+import { permission } from "node:process";
 import { AuthorizationRequired, ValidationError } from "../auth/errors";
 import { EventError, EventNotFoundError } from "../lib/errors";
 import { Err, Ok, Result } from "../lib/result";
@@ -45,7 +46,7 @@ class EventService implements IEventService {
         }
     
         return Ok(undefined);
-      }
+    }
 
     async createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
@@ -56,8 +57,16 @@ class EventService implements IEventService {
     }
 
     async getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError>> {
-        // TODO
-        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
+        const event = await this.eventRepository.getEventById(eventId);
+
+        if (event.ok) {
+            const permissionCheck = this.canEditEvent(event.value, user);
+            if (permissionCheck.ok) {
+                return Ok(event.value);
+            } else return permissionCheck;
+        } else {
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        }
     }
 
     async updateEvent(eventId: number, user: IAuthenticatedUserSession, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
