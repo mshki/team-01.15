@@ -365,6 +365,29 @@ class ExpressApp implements IApp {
       }),
     );
 
+    // ── Event Details ────────────────────────────────────────────────
+
+    this.app.get(
+      "/events/:id",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const id = parseInt(req.params.id as string, 10);
+        if (!Number.isInteger(id) || id <= 0) {
+          res.status(400).render("partials/error", {
+            message: "Invalid event ID.",
+            layout: false,
+          });
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.showEventDetails(res, id, browserSession);
+      }),
+    );
+
     // -- Feature 4: RSVP Toggle ————————————————————————————————————————————————
 
     this.app.post(
@@ -409,51 +432,6 @@ class ExpressApp implements IApp {
       });
     });
 
-    // Event Creation Routes
-
-    this.app.get(
-      "/events/new",
-      asyncHandler(async (req, res) => {
-        if (!this.requireAuthenticated(req, res)) {
-          return;
-        }
-        const browserSession = touchAppSession(sessionStore(req));
-        await this.controller.showEventForm(res, browserSession);
-      }),
-    );
-
-    this.app.get(
-      "/events/:id",
-      asyncHandler(async (req, res) => {
-        if (!this.requireAuthenticated(req, res)) {
-          return;
-        }
-
-        const browserSession = touchAppSession(sessionStore(req));
-
-        await this.controller.showEventDetails(res, typeof req.params.id === "number" ? req.params.id : 0, browserSession);
-      }),
-    );
-
-    this.app.post(
-      "/events",
-      asyncHandler(async (req, res) => {
-        if (!this.requireAuthenticated(req, res)) {
-          return;
-        }
-
-        const browserSession = touchAppSession(sessionStore(req));
-        await this.controller.newEventFromForm(res, 
-          typeof req.body.name === "string" ? req.body.name : "",
-          typeof req.body.description === "string" ? req.body.description : "",
-          typeof req.body.location === "string" ? req.body.location : "",
-          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
-          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
-          typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
-          browserSession
-        );
-      }),
-    );
   }
 
   getExpressApp(): express.Express {
