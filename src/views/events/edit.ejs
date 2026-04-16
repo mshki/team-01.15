@@ -1,14 +1,22 @@
 <!-- views/events/edit.ejs -->
 <%
-  const form = (typeof values !== 'undefined' && values) ? values : event;
+    const form = (typeof values !== 'undefined' && values) ? values : event;
 
-  const titleValue = form.title ?? form.name ?? '';
-  const descriptionValue = form.description ?? '';
-  const locationValue = form.location ?? '';
-  const capacityValue = form.capacity ?? '';
-  const startValue = form.startDatetime;
-  const endValue = form.endDatetime;
-  const pageMessage = typeof pageError !== 'undefined' ? pageError : (typeof error !== 'undefined' ? error : '');
+    function toDatetimeLocal(value) {
+        if (!value) return '';
+        const d = new Date(value);
+        const pad = (n) => String(n).padStart(2, '0');
+      
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    const titleValue = form.title ?? form.name ?? '';
+    const descriptionValue = form.description ?? '';
+    const locationValue = form.location ?? '';
+    const capacityValue = form.capacity ?? '';
+    const startValue = toDatetimeLocal(form.startDatetime);
+    const endValue = toDatetimeLocal(form.endDatetime);
+    const pageMessage = typeof pageError !== 'undefined' ? pageError : (typeof error !== 'undefined' ? error : '');
 %>
 
 <section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
