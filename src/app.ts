@@ -256,6 +256,40 @@ class ExpressApp implements IApp {
       }),
     );
 
+    // ── Event Creation Routes ────────────────────────────────────────
+
+    this.app.get(
+      "/events/new",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.showEventForm(res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        const capacityRaw = typeof req.body.capacity === "string" && req.body.capacity !== "" ? parseInt(req.body.capacity, 10) : null;
+        await this.controller.newEventFromForm(res,
+          typeof req.body.name === "string" ? req.body.name : "",
+          typeof req.body.description === "string" ? req.body.description : "",
+          typeof req.body.location === "string" ? req.body.location : "",
+          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
+          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
+          capacityRaw,
+          browserSession
+        );
+      }),
+    );
+
     // —— Feature 3: Event Editing ————————————————————————————————————————————————
 
     this.app.get(
@@ -324,8 +358,8 @@ class ExpressApp implements IApp {
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
           // TOOD: discuss logic for start and end date times 
-          req.body.startDatetime instanceof Date ? req.body.datetime : null,
-          req.body.endDatetime instanceof Date ? req.body.datetime : null,
+          req.body.startDatetime instanceof Date ? req.body.startDatetime : null,
+          req.body.endDatetime instanceof Date ? req.body.endDatetime : null,
           typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
           browserSession);
       }),
@@ -413,7 +447,8 @@ class ExpressApp implements IApp {
           typeof req.body.name === "string" ? req.body.name : "",
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
-          typeof req.body.datetime === "string" ? req.body.datetime : "",
+          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
+          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
           browserSession
         );

@@ -8,13 +8,13 @@ import { EventStatus } from "@prisma/client";
 
 export interface IEventController {
     showEventForm(res: Response, session: IAppBrowserSession): Promise<void>;
-    newEventFromForm(res: Response, 
+    newEventFromForm(res: Response,
         name: string,
         description: string,
         location: string,
         startDatetime: string,
         endDatetime: string,
-        capacity: number,
+        capacity: number | null,
         session: IAppBrowserSession
     ): Promise<void>;
     showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
@@ -57,16 +57,16 @@ class EventController implements IEventController {
       }
     
     async showEventForm(res: Response, session: IAppBrowserSession): Promise<void> {
-        return;
+        res.render("events/new", { session, pageError: null });
     }
 
-    async newEventFromForm(res: Response, 
+    async newEventFromForm(res: Response,
         name: string,
         description: string,
         location: string,
         startDatetime: string,
         endDatetime: string,
-        capacity: number,
+        capacity: number | null,
         session: IAppBrowserSession
     ): Promise<void> {
         this.logger.info(`Creating new event with name "${name}"`);
