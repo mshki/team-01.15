@@ -11,6 +11,7 @@ export interface IEventRepository {
     createEvent(event: IEvent): Promise<Result<IEvent, EventError>>;
     updateEvent(id: string, event: Partial<IEvent>): Promise<Result<IEvent, EventError>>;
     deleteEvent(id: string): Promise<Result<void, EventError>>;
+    searchEvents(query: string): Promise<Result<IEvent[], EventError>>; 
 }
 
 type PrismaEventFull = Event & {
