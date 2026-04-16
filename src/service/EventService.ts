@@ -1,11 +1,11 @@
 import { EventError, EventNotFoundError } from "../lib/errors";
 import { Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
-import { IEvent } from "../types/EventTypes";
+import { CreateEventData, IEvent } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 
 export interface IEventService {
-    createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>>;
+    createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
     getEventEditForm(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     updateEvent(eventId: number, 
@@ -21,7 +21,9 @@ export interface IEventService {
 class EventService implements IEventService {
     constructor(private readonly eventRepository: IEventRepository, private readonly logger: ILoggingService) {}
 
-    async createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
+    async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
+        
+
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
 
