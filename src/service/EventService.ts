@@ -90,11 +90,25 @@ class EventService implements IEventService {
 
     async getEventDetails(eventId: number): Promise<Result<IEvent, EventError>> {
         // 1. Validate event ID
+        if (!eventId || eventId <= 0) {
+            return Err(ValidationError("Invalid event ID."));
+        }
 
         // 2. Call repository to get event details
+        this.logger.info(`Fetching details for event ID ${eventId}`);
+
+        const result = await this.eventRepository.getEventById(eventId);
+        this.logger.info(`Fetch event details result for ID ${eventId}: ${result.ok ? "Success" : "Error"}`);
+
+        if (!result.ok) {
+            if (result.value.name === "EventNotFoundError") {
+                return Err(EventNotFoundError(`Event with ID ${eventId} not found.`));
+            }
+            return Err(result.value);
+        }
 
         // 3. Handle repository result and return appropriate response
-        return this.eventRepository.getEventById(eventId);
+        return Ok(result.value);
     }
 
     async getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError | AuthError>> {
