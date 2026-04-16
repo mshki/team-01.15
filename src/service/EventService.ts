@@ -12,9 +12,10 @@ import { ILoggingService } from "./LoggingService";
 export interface IEventService {
     createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
-    getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError | AuthError>>;
+    getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError | AuthError>>;
     updateEvent(eventId: number, 
-        user: IAuthenticatedUserSession, 
+        userId: string,
+        userRole: string,
         title: string,
         description: string,
         location: string,
@@ -30,11 +31,11 @@ export interface IEventService {
 class EventService implements IEventService {
     constructor(private readonly eventRepository: IEventRepository, private readonly logger: ILoggingService) {}
 
-    private canEditEvent(event: IEvent, user: IAuthenticatedUserSession): Result<null, EventError | AuthError> {
-        const isAdmin = user.role === "admin";
-        const isOwner = event.organizerId === user.userId;
+    private canEditEvent(event: IEvent, userId: string, userRole: string): Result<null, EventError | AuthError> {
+        const isAdmin = userRole=== "admin";
+        const isOwner = event.organizerId === userId;
     
-        if (user.role === "user" && !isOwner) {
+        if (userRole === "user" && !isOwner) {
             return Err(AuthorizationRequired("Only owner can edit events."));
         }
     
@@ -187,11 +188,11 @@ class EventService implements IEventService {
         return Ok(result.value);
     }
 
-    async getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError | AuthError>> {
+    async getEventEditForm(eventId: number, userId: string, userRole: string): Promise<Result<IEvent, EventError | AuthError>> {
         const event = await this.eventRepository.getEventById(eventId);
 
         if (event.ok) {
-            const permissionCheck = this.canEditEvent(event.value, user);
+            const permissionCheck = this.canEditEvent(event.value, userId, userRole);
             if (permissionCheck.ok) {
                 return Ok(event.value);
             } else return permissionCheck;
@@ -200,8 +201,8 @@ class EventService implements IEventService {
         }
     }
 
-    async updateEvent(eventId: number, user: IAuthenticatedUserSession, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
-        const eventResult = await this.getEventEditForm(eventId, user);
+    async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
+        const eventResult = await this.getEventEditForm(eventId, userId, userRole);
         if (!eventResult.ok) {
             // TODO: verify error
           return Err(ValidationError("Cannot edit event."));
