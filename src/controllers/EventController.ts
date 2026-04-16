@@ -30,6 +30,12 @@ export interface IEventController {
         endDatetime: Date,
         capacity: number,
         session: IAppBrowserSession): Promise<void>;
+    toggleRsvpFromForm(
+        res: Response,
+        eventId: number,
+        user: IAuthenticatedUserSession,
+        session: IAppBrowserSession
+        ): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -193,6 +199,20 @@ class EventController implements IEventController {
         }
 
         res.redirect(`/events/${result.value.id}`);
+    }
+
+    async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
+        const result = await this.eventService.toggleRsvp(eventId, user.userId);
+
+        if (!result.ok) {
+          res.status(this.mapErrorStatus(result.value)).render("events/partials/error", {
+            message: result.value.message,
+            layout: false,
+          });
+          return;
+        }
+    
+        res.redirect(`/events/${eventId}`);
     }
 }
 

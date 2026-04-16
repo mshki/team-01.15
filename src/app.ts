@@ -394,7 +394,7 @@ class ExpressApp implements IApp {
           return;
         }
     
-        await this.controller.toggleRsvp(req, res, id, currentUser, browserSession);
+        await this.controller.toggleRsvpFromForm(res, id, currentUser, browserSession);
       }),
     );
 
