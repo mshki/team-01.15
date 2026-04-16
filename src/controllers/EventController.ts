@@ -199,7 +199,6 @@ class EventController implements IEventController {
         res.render("events/edit", {
             event: result.value,
             session,
-            layout: false,
         });
     }
 
