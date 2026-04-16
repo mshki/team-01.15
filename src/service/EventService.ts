@@ -49,6 +49,26 @@ class EventService implements IEventService {
         return Ok(null);
     }
 
+    private canRsvp(event: IEvent): Result<void, EventError> {
+        if (event.status === "CANCELLED") {
+          return Err(ValidationError("Cancelled events cannot receive RSVPs."));
+        }
+    
+        if (event.status === "CONCLUDED") {
+          return Err(ValidationError("Concluded events cannot receive RSVPs."));
+        }
+    
+        if (event.status !== "PUBLISHED") {
+          return Err(ValidationError("Only published events can receive RSVPs."));
+        }
+    
+        if (event.endDatetime.getTime() < Date.now()) {
+          return Err(ValidationError("Past events cannot receive RSVPs."));
+        }
+    
+        return Ok(undefined);
+      }
+
     async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
         // 1. Validate input data
         const title = String(eventData.title ?? "").trim();
