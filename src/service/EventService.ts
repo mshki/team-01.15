@@ -26,10 +26,12 @@ class EventService implements IEventService {
         const event = eventResult.value;
 
         if (event.eventDesc.organizerId !== userId) {
+            this.logger.info(`Publish denied for user ${userId} on event ${eventId}: not organizer`);
             return Err(ValidationError("Only the organizer can publish this event"));
         }
 
         if (event.eventDesc.status !== "DRAFT") {
+            this.logger.info(`Publish denied for event ${eventId}: status is ${event.eventDesc.status}`);
             return Err(ValidationError("Only draft events can be published"));
         }
 
@@ -58,10 +60,12 @@ class EventService implements IEventService {
         const isOrganizer = event.eventDesc.organizerId === userId;
 
         if (!isOrganizer && !isAdmin) {
+            this.logger.info(`Cancel denied for user ${userId} on event ${eventId}: not organizer or admin`);
             return Err(ValidationError("Only the organizer or an admin can cancel this event"));
         }
 
         if (event.eventDesc.status !== "PUBLISHED") {
+            this.logger.info(`Cancel denied for event ${eventId}: status is ${event.eventDesc.status}`);
             return Err(ValidationError("Only published events can be cancelled"));
         }
 
