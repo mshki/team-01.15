@@ -19,6 +19,7 @@ import {
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
 import { IEvent } from "./types/EventTypes";
+import { IEventService } from "./service/EventService";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -39,6 +40,7 @@ class ExpressApp implements IApp {
     private readonly controller: IEventController,
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
+    private readonly eventService: IEventService,
   ) {
     this.app = express();
     this.registerMiddleware();
@@ -256,6 +258,41 @@ class ExpressApp implements IApp {
       }),
     );
 
+    // ── Event Creation Routes ────────────────────────────────────────
+
+    this.app.get(
+      "/events/new",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.showEventForm(res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        const capacityRaw = typeof req.body.capacity === "string" && req.body.capacity !== "" ? parseInt(req.body.capacity, 10) : null;
+        await this.controller.newEventFromForm(res,
+          typeof req.body.name === "string" ? req.body.name : "",
+          typeof req.body.description === "string" ? req.body.description : "",
+          typeof req.body.location === "string" ? req.body.location : "",
+          typeof req.body.category === "string" ? req.body.category : null,
+          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
+          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
+          capacityRaw,
+          browserSession
+        );
+      }),
+    );
+
     // —— Feature 3: Event Editing ————————————————————————————————————————————————
 
     this.app.get(
@@ -324,12 +361,78 @@ class ExpressApp implements IApp {
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
           // TOOD: discuss logic for start and end date times 
-          req.body.startDatetime instanceof Date ? req.body.datetime : null,
-          req.body.endDatetime instanceof Date ? req.body.datetime : null,
+          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
+          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
           browserSession);
       }),
     );
+
+    // -- Feature 4: RSVP Toggle ————————————————————————————————————————————————
+
+    this.app.post(
+      "/events/:id/rsvp/toggle",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+    
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+          res.status(400).render("events/partials/error", {
+            message: "Invalid ID.",
+            layout: false,
+          });
+          return;
+        }
+    
+        const browserSession = touchAppSession(sessionStore(req));
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+    
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+    
+        await this.controller.toggleRsvpFromForm(res, id, currentUser, browserSession);
+      }),
+    );
+    // ── Feature 10: Event Search ─────────────────────────────────────────────────
+
+    // GET /events/search
+    // Renders the search page. Empty query returns all published upcoming events.
+    // this.app.get(
+    //     "/events/search",
+    //     asyncHandler(async (req, res) => {
+    //         if (!this.requireAuthenticated(req, res)) return;
+
+    //         const store = sessionStore(req);
+    //         const query = typeof req.query.q === "string" ? req.query.q : "";
+
+    //         const result = await this.eventService.searchEvents(query);
+
+    //         if (!result.ok) {
+    //             res.status(500).render("partials/error", {
+    //                 message: result.error.message,
+    //                 layout: false,
+    //             });
+    //             return;
+    //         }
+
+    //         const browserSession = recordPageView(store);
+    //         res.render("event-search", {
+    //             session: browserSession,
+    //             query,
+    //             events: result.value,
+    //             pageError: null,
+    //         });
+    //     }),
+    // );
+
+ 
 
     // ── Error handler ────────────────────────────────────────────────
 
@@ -358,13 +461,10 @@ class ExpressApp implements IApp {
     this.app.get(
       "/events/:id",
       asyncHandler(async (req, res) => {
-        if (!this.requireAuthenticated(req, res)) {
-          return;
-        }
-
         const browserSession = touchAppSession(sessionStore(req));
+        const eventId = parseInt(req.params.id as string, 10);
 
-        await this.controller.showEventDetails(res, typeof req.params.id === "number" ? req.params.id : 0, browserSession);
+        await this.controller.showEventDetails(res, eventId, browserSession);
       }),
     );
 
@@ -380,8 +480,96 @@ class ExpressApp implements IApp {
           typeof req.body.name === "string" ? req.body.name : "",
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
-          typeof req.body.datetime === "string" ? req.body.datetime : "",
+          typeof req.body.category === "string" ? req.body.category : null,
+          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
+          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
+          browserSession
+        );
+      }),
+    );
+    this.app.post(
+      "/events/:id/publish",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+
+        const eventId = Number(req.params.id);
+        if (!Number.isInteger(eventId) || eventId <= 0) {
+          res.status(400).render("partials/error", {
+            message: "Invalid event ID.",
+            layout: false,
+          });
+          return;
+        }
+
+        await this.controller.publishFromForm(res, eventId, currentUser.userId);
+      }),
+    );
+
+    this.app.post(
+      "/events/:id/cancel",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+
+        const eventId = Number(req.params.id);
+        if (!Number.isInteger(eventId) || eventId <= 0) {
+          res.status(400).render("partials/error", {
+            message: "Invalid event ID.",
+            layout: false,
+          });
+          return;
+        }
+
+        await this.controller.cancelFromForm(
+          res,
+          eventId,
+          currentUser.userId,
+          currentUser.role === "admin",
+        );
+      }),
+    );
+
+    this.app.get(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        const timeframe =
+          typeof req.query.timeframe === "string" ? req.query.timeframe : "all";
+        const category =
+          typeof req.query.category === "string" && req.query.category.trim() !== ""
+            ? req.query.category
+            : null;
+
+        await this.controller.filterEventsFromQuery(
+          res,
+          timeframe,
+          category,
           browserSession
         );
       }),
@@ -397,6 +585,7 @@ export function CreateApp(
   controller: IEventController,
   authController: IAuthController,
   logger: ILoggingService,
+  eventService: IEventService,
 ): IApp {
-  return new ExpressApp(controller, authController, logger);
+  return new ExpressApp(controller, authController, logger, eventService);
 }
