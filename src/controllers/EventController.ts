@@ -38,9 +38,14 @@ export interface IEventController {
         user: IAuthenticatedUserSession,
         session: IAppBrowserSession
         ): Promise<void>;
-    
     publishFromForm(res: Response, eventId: number, userId: string): Promise<void>;
     cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void>;
+    filterEventsFromQuery(
+        res: Response,
+        timeframe: string,
+        category: string | null,
+        session: IAppBrowserSession
+    ): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -300,7 +305,44 @@ class EventController implements IEventController {
         }
 
         res.redirect(`/events/${eventId}`);
+    }
 
+    async filterEventsFromQuery(
+        res: Response,
+        timeframe: string,
+        category: string | null,
+        session: IAppBrowserSession
+    ): Promise<void> {
+        this.logger.info(
+            `Filtering events with timeframe "${timeframe}" and category "${category ?? "all"}"`
+        );
+
+        const result = await this.eventService.filterPublishedEvents(timeframe, category);
+
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            res.status(status).render("events/partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("events/partials/error", {
+                message: "Unable to filter events.",
+                layout: false,
+            });
+            return;
+        }
+
+        res.render("events/index", {
+            events: result.value,
+            timeframe,
+            category,
+            session,
+            pageError: null,
+        });
     }
 }
 
