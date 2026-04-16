@@ -31,7 +31,7 @@ class InMemoryEventRepository implements IEventRepository {
         if (!event) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
         }
-        const updated = { ...event, ...updates, updatedAt: new Date() };
+        const updated = { ...event, ...updates, id: event.id, organizerId: event.organizerId, createdAt: event.createdAt};
         this.events.set(id, updated);
         return Ok(updated);
     }
