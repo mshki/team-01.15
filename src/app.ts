@@ -286,10 +286,50 @@ class ExpressApp implements IApp {
           });
           return;
         } else {
-          await this.controller.editFromForm(res, id, browserSession);
+          await this.controller.getEditForm(res, id, currentUser, browserSession);
         }
       }),
     )
+
+    this.app.post(
+      "/events/:id/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) return;
+    
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+          res.status(400).render("events/partials/error", {
+            message: "Invalid ID.",
+            layout: false,
+          });
+          return;
+        }
+    
+        const browserSession = touchAppSession(sessionStore(req));
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+    
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+    
+        await this.controller.editFromForm(
+          res, 
+          id, 
+          currentUser, 
+          typeof req.body.name === "string" ? req.body.name : "",
+          typeof req.body.description === "string" ? req.body.description : "",
+          typeof req.body.location === "string" ? req.body.location : "",
+          // TOOD: discuss logic for start and end date times 
+          req.body.startDatetime instanceof Date ? req.body.datetime : null,
+          req.body.endDatetime instanceof Date ? req.body.datetime : null,
+          typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
+          browserSession);
+      }),
+    );
 
     // ── Error handler ────────────────────────────────────────────────
 
