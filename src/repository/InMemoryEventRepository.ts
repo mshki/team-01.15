@@ -1,4 +1,4 @@
-import { EventNotFoundError } from "../lib/errors";
+import { EventNotFoundError, DatabaseError } from "../lib/errors";
 import { Err, Ok, type Result } from "../lib/result";
 import type { EventError } from "../lib/errors";
 import type { IEventRepository } from "./EventRepository";

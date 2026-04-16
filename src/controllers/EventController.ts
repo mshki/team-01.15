@@ -4,7 +4,8 @@ import { ILoggingService } from "../service/LoggingService";
 import { IAppBrowserSession, IAuthenticatedUserSession } from "../session/AppSession";
 import { EventError } from "../lib/errors";
 import { IApp } from "../contracts";
-import { EventStatus } from "@prisma/client";
+import { stat } from "node:fs";
+import { EventStatus } from "../types/EventTypes";
 
 export interface IEventController {
     showEventForm(res: Response, session: IAppBrowserSession): Promise<void>;
@@ -12,6 +13,7 @@ export interface IEventController {
         name: string,
         description: string,
         location: string,
+        category: string | null,
         startDatetime: string,
         endDatetime: string,
         capacity: number | null,
@@ -36,7 +38,9 @@ export interface IEventController {
         user: IAuthenticatedUserSession,
         session: IAppBrowserSession
         ): Promise<void>;
-    filterEventsFromQuery(res: Response, timeframe: string, session: IAppBrowserSession): Promise<void>;
+    
+    publishFromForm(res: Response, eventId: number, userId: string): Promise<void>;
+    cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -65,6 +69,7 @@ class EventController implements IEventController {
         name: string,
         description: string,
         location: string,
+        category: string | null,
         startDatetime: string,
         endDatetime: string,
         capacity: number | null,
@@ -83,8 +88,9 @@ class EventController implements IEventController {
             title: name,
             description: description,
             location: location,
+            category: category,
             capacity: capacity,
-            status: EventStatus.PUBLISHED,
+            status: "PUBLISHED" as EventStatus, // Default to DRAFT if you want to require manual publishing
             organizerId: session.authenticatedUser.userId,
             startDatetime: new Date(startDatetime),
             endDatetime: new Date(endDatetime),
@@ -110,8 +116,54 @@ class EventController implements IEventController {
         res.redirect("/home");
     }
 
-    async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
-        return;
+        async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+        // 1. Verify eventId is valid
+        if (!eventId || eventId <= 0) {
+            this.logger.warn(`showEventDetails called with invalid event ID: ${eventId}`);
+            res.status(404).render("partials/error", { message: "Event not found.", layout: false });
+            return;
+        }
+
+        this.logger.info(`Loading event details for event ${eventId}`);
+
+        // 2. Load event details from EventService
+        const result = await this.eventService.getEventDetails(eventId);
+
+        // 6. If event not found, show error page
+        if (!result.ok) {
+            const error = result.value as EventError;
+            const status = this.mapErrorStatus(error);
+            this.logger.warn(`Failed to load event ${eventId}: ${error.message}`);
+            res.status(status).render("partials/error", { message: error.message, layout: false });
+            return;
+        }
+
+        // 3. If event is found
+        const event = result.value;
+        const currentUser = session.authenticatedUser;
+        const isAdmin = currentUser?.role === "admin";
+        const isOrganizer = currentUser?.userId === event.organizerId;
+
+        // 4. If user is organizer or admin role, show regardless of status
+        // 5. If event is published show, else if draft don't show (return 404 to avoid leaking existence)
+        if (event.status === "DRAFT" && !isAdmin && !isOrganizer) {
+            this.logger.warn(`User ${currentUser?.userId ?? "anonymous"} attempted to view draft event ${eventId}`);
+            res.status(404).render("partials/error", { message: "Event not found.", layout: false });
+            return;
+        }
+
+        const organizerName = isOrganizer && currentUser
+            ? currentUser.displayName
+            : event.organizerId;
+
+        this.logger.info(`Rendering event details for event ${eventId} (status: ${event.status})`);
+
+        res.render("events/show", {
+            event,
+            session,
+            organizerName,
+            pageError: null,
+        });
     }
 
     async getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
@@ -206,8 +258,9 @@ class EventController implements IEventController {
         const result = await this.eventService.toggleRsvp(eventId, user.userId);
 
         if (!result.ok) {
-          res.status(this.mapErrorStatus(result.value)).render("events/partials/error", {
-            message: result.value.message,
+          const error = result.value as EventError;
+          res.status(this.mapErrorStatus(error)).render("events/partials/error", {
+            message: error.message,
             layout: false,
           });
           return;
@@ -215,38 +268,39 @@ class EventController implements IEventController {
     
         res.redirect(`/events/${eventId}`);
     }
-    async filterEventsFromQuery(
-        res: Response,
-        timeframe: string,
-        session: IAppBrowserSession
-    ): Promise<void> {
-        this.logger.info(`Filtering events with timeframe "${timeframe}"`);
+    async publishFromForm(res: Response, eventId: number, userId: string): Promise<void> {
+        this.logger.info(`POST publish event ${eventId} by user ${userId}`);
 
-        const result = await this.eventService.filterPublishedEvents(timeframe);
-        
-        if (!result.ok && this.isEventError(result.value)) {
-            const status = this.mapErrorStatus(result.value);
-            res.status(status).render("events/partials/error", {
-                message: result.value.message,
-                layout: false,
-            });
-            return;
-        }
+        const result = await this.eventService.publishEvent(eventId, userId);
 
         if (!result.ok) {
-            res.status(500).render("events/partials/error", {
-                message: "Unable to filter events.",
+           const error = result.value as EventError;
+           res.status(400).render("partials/error", {
+               message: error.message,
                 layout: false,
             });
             return;
         }
 
-        res.render("events/index", {
-            events: result.value,
-            timeframe,
-            session,
-            pageError: null,
-        });
+        res.redirect(`/events/${eventId}`);
+
+    }
+    async cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void> {
+        this.logger.info(`POST cancel event ${eventId} by user ${userId}`);
+
+        const result = await this.eventService.cancelEvent(eventId, userId, isAdmin);
+
+        if (!result.ok) {
+            const error = result.value as EventError;
+            res.status(400).render("partials/error", {
+                message: error.message,
+                layout: false,
+            });
+            return;
+        }
+
+        res.redirect(`/events/${eventId}`);
+
     }
 }
 

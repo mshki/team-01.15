@@ -7,6 +7,8 @@ import { IEventRepository } from "../repository/EventRepository";
 import { CreateEventData, IEvent, IRSVP } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 
+
+
 export interface IEventService {
     createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
@@ -20,6 +22,9 @@ export interface IEventService {
         endDatetime: Date,
         capacity: number): Promise<Result<IEvent, EventError>>;
     toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>>;
+    publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
+    cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
+    filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
 }
 
 class EventService implements IEventService {
@@ -48,6 +53,20 @@ class EventService implements IEventService {
     
         return Ok(null);
     }
+    // async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+    //     this.logger.info(`searchEvents called with query: "${query}"`);
+
+    //     const result = await this.eventRepository.searchEvents(query);
+
+    //     if (!result.ok) {
+    //         this.logger.warn(`searchEvents failed: ${result.error.message}`);
+    //         return result;
+    //     }
+
+    //     this.logger.info(`searchEvents returned ${result.value.length} results`);
+    //     return result;
+    // }
+
 
     async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
         // 1. Validate input data
@@ -102,10 +121,11 @@ class EventService implements IEventService {
         this.logger.info(`Fetch event details result for ID ${eventId}: ${result.ok ? "Success" : "Error"}`);
 
         if (!result.ok) {
-            if (result.value.name === "EventNotFoundError") {
+            const error = result.value as EventError;
+            if (error.name === "EventNotFoundError") {
                 return Err(EventNotFoundError(`Event with ID ${eventId} not found.`));
             }
-            return Err(result.value);
+            return Err(error);
         }
 
         // 3. Handle repository result and return appropriate response
@@ -181,6 +201,152 @@ class EventService implements IEventService {
         // TODO
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
+    async publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>> {
+        this.logger.info(`User ${userId} is publishing event ${eventId}`);
+
+        const eventResult = await this.eventRepository.getEventById(eventId);
+
+        if (!eventResult.ok) {
+            return eventResult;
+        }
+
+        const event = eventResult.value;
+
+        if (event.organizerId !== userId) {
+            this.logger.info(`Publish denied for user ${userId} on event ${eventId}: not organizer`);
+            return Err(ValidationError("Only the organizer can publish this event"));
+        }
+
+        if (event.status !== "DRAFT") {
+            this.logger.info(`Publish denied for event ${eventId}: status is ${event.status}`);
+            return Err(ValidationError("Only draft events can be published"));
+        }
+
+        const updatedResult = await this.eventRepository.updateEvent(eventId, {
+            status: "PUBLISHED",
+            updatedAt: new Date(),
+        });
+
+        if (updatedResult.ok) {
+            this.logger.info(`Event ${eventId} published successfully`);
+        }
+
+        return updatedResult;
+    }
+
+    async cancelEvent(
+        eventId: number,
+        userId: string,
+        isAdmin: boolean,
+    ): Promise<Result<IEvent, EventError>> {
+        this.logger.info(`User ${userId} is cancelling event ${eventId}`);
+
+        const eventResult = await this.eventRepository.getEventById(eventId);
+
+        if (!eventResult.ok) {
+            return eventResult;
+        }
+
+        const event = eventResult.value;
+        const isOrganizer = event.organizerId === userId;
+
+        if (!isOrganizer && !isAdmin) {
+            this.logger.info(`Cancel denied for user ${userId} on event ${eventId}: not organizer or admin`);
+            return Err(ValidationError("Only the organizer or an admin can cancel this event"));
+        }
+
+        if (event.status !== "PUBLISHED") {
+            this.logger.info(`Cancel denied for event ${eventId}: status is ${event.status}`);
+            return Err(ValidationError("Only published events can be cancelled"));
+        }
+
+        const updatedResult = await this.eventRepository.updateEvent(eventId, {
+            status: "CANCELLED",
+            updatedAt: new Date(),
+        });
+
+        if (updatedResult.ok) {
+            this.logger.info(`Event ${eventId} cancelled successfully`);
+        }
+
+        return updatedResult;
+    }
+
+    async filterPublishedEvents(
+        timeframe: string = "all",
+        category: string | null = null
+    ): Promise<Result<IEvent[], EventError>> {
+        this.logger.info(
+            `Filtering published events with timeframe "${timeframe}" and category "${category ?? "all"}"`
+        );
+
+        const allEventsResult = await this.eventRepository.getAllEvents();
+
+        if (!allEventsResult.ok) {
+            return allEventsResult;
+        }
+
+        const now = new Date();
+
+        let filteredEvents = allEventsResult.value.filter(
+            (event) =>
+                event.status === "PUBLISHED" &&
+                event.endDatetime.getTime() >= now.getTime()
+        );
+
+        if (category && category.trim() !== "") {
+            filteredEvents = filteredEvents.filter(
+                (event) => (event.category ?? "").toLowerCase() === category.toLowerCase()
+            );
+        }
+
+        if (timeframe === "all") {
+            return Ok(filteredEvents);
+        }
+
+        if (timeframe === "week") {
+            const endOfWeek = new Date(now);
+            endOfWeek.setDate(now.getDate() + 7);
+
+            return Ok(
+                filteredEvents.filter(
+                    (event) => event.startDatetime.getTime() <= endOfWeek.getTime()
+                )
+            );
+        }
+
+        if (timeframe === "weekend") {
+            const weekend = this.getUpcomingWeekendRange(now);
+
+            return Ok(
+                filteredEvents.filter((event) => {
+                    const start = event.startDatetime.getTime();
+                    return (
+                        start >= weekend.start.getTime() &&
+                        start <= weekend.end.getTime()
+                    );
+                })
+            );
+        }
+
+        return Err(ValidationError("Invalid timeframe filter"));
+    }
+    private getUpcomingWeekendRange(now: Date): { start: Date; end: Date } {
+        const day = now.getDay(); // 0=Sun ... 6=Sat
+        const daysUntilSaturday = day === 6 ? 0 : (6 - day + 7) % 7;
+
+        const saturday = new Date(now);
+        saturday.setDate(now.getDate() + daysUntilSaturday);
+        saturday.setHours(0, 0, 0, 0);
+
+        const sundayEnd = new Date(saturday);
+        sundayEnd.setDate(saturday.getDate() + 1);
+        sundayEnd.setHours(23, 59, 59, 999);
+
+        return { start: saturday, end: sundayEnd };
+    }
+
+
 }
 
 export function createEventService(eventRepository: IEventRepository, logger: ILoggingService): IEventService {
