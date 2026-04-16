@@ -174,7 +174,7 @@ class EventController implements IEventController {
     async getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
         this.logger.info(`Loading edit form for event ${id}`);
 
-        const result = await this.eventService.getEventEditForm(id, user);
+        const result = await this.eventService.getEventEditForm(id, user.userId, user.role);
 
         if (!result.ok && this.isEventError(result.value)) {
             const status = this.mapErrorStatus(result.value);
@@ -217,8 +217,9 @@ class EventController implements IEventController {
         this.logger.info(`Editing event ${id}`);
       
         const result = await this.eventService.updateEvent(
-            id,
-            user,
+            id, 
+            user.userId, 
+            user.role,
             name,
             description,
             location,
