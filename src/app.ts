@@ -3,6 +3,7 @@ import express, { Request, RequestHandler, Response } from "express";
 import session from "express-session";
 import Layouts from "express-ejs-layouts";
 import { IAuthController } from "./auth/AuthController";
+import { IEventController } from "./controllers/EventController";
 import {
   AuthenticationRequired,
   AuthorizationRequired,
@@ -17,6 +18,7 @@ import {
   touchAppSession,
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
+import { IEvent } from "./types/EventTypes";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -34,6 +36,7 @@ class ExpressApp implements IApp {
   private readonly app: express.Express;
 
   constructor(
+    private readonly controller: IEventController,
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
   ) {
@@ -253,6 +256,148 @@ class ExpressApp implements IApp {
       }),
     );
 
+    // ── Event Creation Routes ────────────────────────────────────────
+
+    this.app.get(
+      "/events/new",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.showEventForm(res, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        const capacityRaw = typeof req.body.capacity === "string" && req.body.capacity !== "" ? parseInt(req.body.capacity, 10) : null;
+        await this.controller.newEventFromForm(res,
+          typeof req.body.name === "string" ? req.body.name : "",
+          typeof req.body.description === "string" ? req.body.description : "",
+          typeof req.body.location === "string" ? req.body.location : "",
+          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
+          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
+          capacityRaw,
+          browserSession
+        );
+      }),
+    );
+
+    // —— Feature 3: Event Editing ————————————————————————————————————————————————
+
+    this.app.get(
+      "/events/:id/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        // check event exists
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+          // TODO: partials/error needs to be added
+          res.status(400).render("events/partials/error", {
+            message: "Invalid ID.",
+            layout: false,
+          });
+          return;
+        } 
+
+        const browserSession = touchAppSession(sessionStore(req));
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        } else {
+          await this.controller.getEditForm(res, id, currentUser, browserSession);
+        }
+      }),
+    )
+
+    this.app.post(
+      "/events/:id/edit",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) return;
+    
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+          res.status(400).render("events/partials/error", {
+            message: "Invalid ID.",
+            layout: false,
+          });
+          return;
+        }
+    
+        const browserSession = touchAppSession(sessionStore(req));
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+    
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+    
+        await this.controller.editFromForm(
+          res, 
+          id, 
+          currentUser, 
+          typeof req.body.name === "string" ? req.body.name : "",
+          typeof req.body.description === "string" ? req.body.description : "",
+          typeof req.body.location === "string" ? req.body.location : "",
+          // TOOD: discuss logic for start and end date times 
+          req.body.startDatetime instanceof Date ? req.body.startDatetime : null,
+          req.body.endDatetime instanceof Date ? req.body.endDatetime : null,
+          typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
+          browserSession);
+      }),
+    );
+
+    // -- Feature 4: RSVP Toggle ————————————————————————————————————————————————
+
+    this.app.post(
+      "/events/:id/rsvp/toggle",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+    
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+          res.status(400).render("events/partials/error", {
+            message: "Invalid ID.",
+            layout: false,
+          });
+          return;
+        }
+    
+        const browserSession = touchAppSession(sessionStore(req));
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+    
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+    
+        await this.controller.toggleRsvpFromForm(res, id, currentUser, browserSession);
+      }),
+    );
+
     // ── Error handler ────────────────────────────────────────────────
 
     this.app.use((err: unknown, _req: Request, res: Response, _next: (value?: unknown) => void) => {
@@ -263,6 +408,52 @@ class ExpressApp implements IApp {
         layout: false,
       });
     });
+
+    // Event Creation Routes
+
+    this.app.get(
+      "/events/new",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.showEventForm(res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/events/:id",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+
+        await this.controller.showEventDetails(res, typeof req.params.id === "number" ? req.params.id : 0, browserSession);
+      }),
+    );
+
+    this.app.post(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.newEventFromForm(res, 
+          typeof req.body.name === "string" ? req.body.name : "",
+          typeof req.body.description === "string" ? req.body.description : "",
+          typeof req.body.location === "string" ? req.body.location : "",
+          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
+          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
+          typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
+          browserSession
+        );
+      }),
+    );
   }
 
   getExpressApp(): express.Express {
@@ -271,8 +462,9 @@ class ExpressApp implements IApp {
 }
 
 export function CreateApp(
+  controller: IEventController,
   authController: IAuthController,
   logger: ILoggingService,
 ): IApp {
-  return new ExpressApp(authController, logger);
+  return new ExpressApp(controller, authController, logger);
 }

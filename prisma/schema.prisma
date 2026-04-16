@@ -5,15 +5,59 @@ generator client {
 datasource db {
   provider = "sqlite"
 }
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  CONCLUDED
+}
 
-// TODO: Define your project's data models here.
-// Example:
-//
-// model Item {
-//   id        Int      @id @default(autoincrement())
-//   title     String
-//   body      String
-//   status    String   @default("active")
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
+enum RSVPStatus {
+  YES
+  NO
+  WAITLIST
+}
+
+model User {
+  id        String          @id @default(uuid())
+  email     String          @unique
+  attendees EventAttendee[]
+}
+
+model Event {
+  id          Int             @id @default(autoincrement())
+  title       String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  attendees   EventAttendee[]
+  eventDesc   EventDesc?
+}
+
+model EventDesc {
+  id        Int         @id @default(autoincrement())
+  eventId   Int         @unique
+  title     String
+  desc      String
+  location  String
+  category  String
+  datetime  DateTime
+  organizer String
+  capacity  Int
+  status    EventStatus @default(DRAFT)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventAttendee {
+  eventId   Int
+  userId    String
+  rsvp      RSVPStatus @default(WAITLIST)
+  createdAt DateTime   @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, userId])
+  @@unique([eventId, userId])
+}
