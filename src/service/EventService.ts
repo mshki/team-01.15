@@ -4,7 +4,7 @@ import { EventError, EventNotFoundError, ValidationError } from "../lib/errors";
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
-import { CreateEventData, IEvent, IRSVP } from "../types/EventTypes";
+import { CreateEventData, IEvent, IRSVP, RSVPStatus } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 
 export interface IEventService {
@@ -51,23 +51,32 @@ class EventService implements IEventService {
 
     private canRsvp(event: IEvent): Result<void, EventError> {
         if (event.status === "CANCELLED") {
-          return Err(ValidationError("Cancelled events cannot receive RSVPs."));
+            return Err(ValidationError("Cancelled events cannot receive RSVPs."));
         }
     
         if (event.status === "CONCLUDED") {
-          return Err(ValidationError("Concluded events cannot receive RSVPs."));
+            return Err(ValidationError("Concluded events cannot receive RSVPs."));
         }
     
         if (event.status !== "PUBLISHED") {
-          return Err(ValidationError("Only published events can receive RSVPs."));
+            return Err(ValidationError("Only published events can receive RSVPs."));
         }
     
         if (event.endDatetime.getTime() < Date.now()) {
-          return Err(ValidationError("Past events cannot receive RSVPs."));
+            return Err(ValidationError("Past events cannot receive RSVPs."));
         }
     
         return Ok(undefined);
-      }
+    }
+
+    private async nextJoinStatus(event: IEvent): Promise<RSVPStatus> {
+        if (event.capacity === null) {
+            return "GOING";
+        }
+    
+        const goingCount = await this.repo.countGoingRsvps(event.id);
+        return goingCount < event.capacity ? "GOING" : "WAITLISTED";
+    }
 
     async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
         // 1. Validate input data
