@@ -58,7 +58,7 @@ class EventService implements IEventService {
         const result = await this.eventRepository.searchEvents(query);
 
         if (!result.ok) {
-            this.logger.warn(`searchEvents failed: ${result.error.message}`);
+            this.logger.warn(`searchEvents failed: ${result.value.message}`);
             return result;
         }
 
@@ -87,14 +87,40 @@ class EventService implements IEventService {
         return Ok(undefined);
     }
 
-    private async nextJoinStatus(event: IEvent): Promise<RSVPStatus> {
+    private countGoing(attendees: IRSVP[]): number {
+        return attendees.filter((r) => r.rsvpStatus === "GOING").length;
+      }
+      
+      private nextJoinStatus(event: IEvent): RSVPStatus {
         if (event.capacity === null) {
-            return "GOING";
+          return "GOING";
         }
-    
-        const goingCount = await this.repo.countGoingRsvps(event.id);
+      
+        const goingCount = this.countGoing(event.attendees);
         return goingCount < event.capacity ? "GOING" : "WAITLISTED";
-    }
+      }
+      
+      private promoteWaitlistedIfPossible(event: IEvent): IRSVP | null {
+        if (event.capacity === null) {
+          return null;
+        }
+      
+        const goingCount = this.countGoing(event.attendees);
+        if (goingCount >= event.capacity) {
+          return null;
+        }
+      
+        const waitlisted = event.attendees
+          .filter((r) => r.rsvpStatus === "WAITLISTED")
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+      
+        if (!waitlisted) {
+          return null;
+        }
+      
+        waitlisted.rsvpStatus = "GOING";
+        return waitlisted;
+      }
 
     async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
         // 1. Validate input data
