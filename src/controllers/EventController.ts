@@ -112,8 +112,54 @@ class EventController implements IEventController {
         res.redirect("/home");
     }
 
-    async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
-        return;
+        async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+        // 1. Verify eventId is valid
+        if (!eventId || eventId <= 0) {
+            this.logger.warn(`showEventDetails called with invalid event ID: ${eventId}`);
+            res.status(404).render("partials/error", { message: "Event not found.", layout: false });
+            return;
+        }
+
+        this.logger.info(`Loading event details for event ${eventId}`);
+
+        // 2. Load event details from EventService
+        const result = await this.eventService.getEventDetails(eventId);
+
+        // 6. If event not found, show error page
+        if (!result.ok) {
+            const error = result.value as EventError;
+            const status = this.mapErrorStatus(error);
+            this.logger.warn(`Failed to load event ${eventId}: ${error.message}`);
+            res.status(status).render("partials/error", { message: error.message, layout: false });
+            return;
+        }
+
+        // 3. If event is found
+        const event = result.value;
+        const currentUser = session.authenticatedUser;
+        const isAdmin = currentUser?.role === "admin";
+        const isOrganizer = currentUser?.userId === event.organizerId;
+
+        // 4. If user is organizer or admin role, show regardless of status
+        // 5. If event is published show, else if draft don't show (return 404 to avoid leaking existence)
+        if (event.status === "DRAFT" && !isAdmin && !isOrganizer) {
+            this.logger.warn(`User ${currentUser?.userId ?? "anonymous"} attempted to view draft event ${eventId}`);
+            res.status(404).render("partials/error", { message: "Event not found.", layout: false });
+            return;
+        }
+
+        const organizerName = isOrganizer && currentUser
+            ? currentUser.displayName
+            : event.organizerId;
+
+        this.logger.info(`Rendering event details for event ${eventId} (status: ${event.status})`);
+
+        res.render("events/show", {
+            event,
+            session,
+            organizerName,
+            pageError: null,
+        });
     }
 
     async getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
@@ -208,8 +254,9 @@ class EventController implements IEventController {
         const result = await this.eventService.toggleRsvp(eventId, user.userId);
 
         if (!result.ok) {
-          res.status(this.mapErrorStatus(result.value)).render("events/partials/error", {
-            message: result.value.message,
+          const error = result.value as EventError;
+          res.status(this.mapErrorStatus(error)).render("events/partials/error", {
+            message: error.message,
             layout: false,
           });
           return;
@@ -223,8 +270,9 @@ class EventController implements IEventController {
         const result = await this.eventService.publishEvent(eventId, userId);
 
         if (!result.ok) {
+           const error = result.value as EventError;
            res.status(400).render("partials/error", {
-               message: result.value.message,
+               message: error.message,
                 layout: false,
             });
             return;
@@ -239,8 +287,9 @@ class EventController implements IEventController {
         const result = await this.eventService.cancelEvent(eventId, userId, isAdmin);
 
         if (!result.ok) {
+            const error = result.value as EventError;
             res.status(400).render("partials/error", {
-                message: result.value.message,
+                message: error.message,
                 layout: false,
             });
             return;
