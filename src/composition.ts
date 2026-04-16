@@ -23,8 +23,6 @@ export function createComposedApp(eventController: IEventController, logger?: IL
   const authController = CreateAuthController(authService, adminUserService, resolvedLogger);
   const eventRepo = createInMemoryEventRepository();
   const eventService = createEventService(eventRepo, resolvedLogger);
-  const rsvpRepo = createRSVPRepository();
-  const waitlistService = createWaitlistService(rsvpRepo, eventRepo);
 
-  return CreateApp(eventController, authController, resolvedLogger, waitlistService, eventService);
+  return CreateApp(eventController, authController, resolvedLogger, eventService);
 }
