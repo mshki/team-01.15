@@ -271,6 +271,7 @@ class EventService implements IEventService {
 
         return updatedResult;
     }
+    
     async filterPublishedEvents(timeframe: string = "all"): Promise<Result<IEvent[], EventError>> {
         this.logger.info(`Filtering published events with timeframe "${timeframe}"`);
 
