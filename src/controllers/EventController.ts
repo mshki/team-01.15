@@ -4,15 +4,17 @@ import { ILoggingService } from "../service/LoggingService";
 import { IAppBrowserSession, IAuthenticatedUserSession } from "../session/AppSession";
 import { EventError } from "../lib/errors";
 import { IApp } from "../contracts";
+import { EventStatus } from "@prisma/client";
 
 export interface IEventController {
     showEventForm(res: Response, session: IAppBrowserSession): Promise<void>;
-    newEventFromForm(res: Response, 
+    newEventFromForm(res: Response,
         name: string,
         description: string,
         location: string,
-        datetime: string,
-        capacity: number,
+        startDatetime: string,
+        endDatetime: string,
+        capacity: number | null,
         session: IAppBrowserSession
     ): Promise<void>;
     showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
@@ -55,18 +57,56 @@ class EventController implements IEventController {
       }
     
     async showEventForm(res: Response, session: IAppBrowserSession): Promise<void> {
-        return;
+        res.render("events/new", { session, pageError: null });
     }
 
-    async newEventFromForm(res: Response, 
+    async newEventFromForm(res: Response,
         name: string,
         description: string,
         location: string,
-        datetime: string,
-        capacity: number,
+        startDatetime: string,
+        endDatetime: string,
+        capacity: number | null,
         session: IAppBrowserSession
     ): Promise<void> {
-        return;
+        this.logger.info(`Creating new event with name "${name}"`);
+
+        if (!session.authenticatedUser) {
+            this.logger.warn("Unauthenticated user attempted to create event.");
+            res.status(401);
+            return;
+        }
+
+        // 1. Construct createEventData
+        const data = {
+            title: name,
+            description: description,
+            location: location,
+            capacity: capacity,
+            status: EventStatus.PUBLISHED,
+            organizerId: session.authenticatedUser.userId,
+            startDatetime: new Date(startDatetime),
+            endDatetime: new Date(endDatetime),
+            attendees: [],
+        };
+
+        // 2. Call service to create event
+        const result = await this.eventService.createEvent(data);
+
+        this.logger.info(`Attempted to create event with name "${name}". Result: ${result.ok ? "Success" : "Error"}`);
+
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            const log = status === 400 ? this.logger.warn : this.logger.error;
+            log.call(this.logger, `Create event failed: ${result.value.message}`);
+
+            res.status(status);
+
+            return
+        }
+
+        // 3. Handle service result and return appropriate response
+        res.redirect("/home");
     }
 
     async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
