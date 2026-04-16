@@ -18,6 +18,7 @@ import {
   touchAppSession,
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
+import { IEvent } from "./types/EventTypes";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -255,7 +256,7 @@ class ExpressApp implements IApp {
       }),
     );
 
-    // —— Event Editing ————————————————————————————————————————————————
+    // —— Feature 3: Event Editing ————————————————————————————————————————————————
 
     this.app.get(
       "/events/:id/edit",
@@ -264,8 +265,7 @@ class ExpressApp implements IApp {
           return;
         }
 
-        // TODO: verify correct session
-        const browserSession = touchAppSession(sessionStore(req));
+        // check event exists
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
           // TODO: partials/error needs to be added
@@ -274,9 +274,20 @@ class ExpressApp implements IApp {
             layout: false,
           });
           return;
-        }
+        } 
 
-        await this.controller.editFromForm(res, id, browserSession);
+        const browserSession = touchAppSession(sessionStore(req));
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        } else {
+          await this.controller.editFromForm(res, id, currentUser, browserSession);
+        }
       }),
     )
 
