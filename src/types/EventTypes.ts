@@ -58,35 +58,32 @@ function normalizeTag(tag?: string): string {
     return normalized || "general";
 }
 
-function normalizeStatus(status?: string): EventStatus {
-    return status === "completed" ? "completed" : "active";
-}
-
-export class Event implements IEvent {
-    id: number;
-    title: string;
-    description: string;
-    location: string;
-    capacity: number | null;
-    status: EventStatus;
-    startDatetime: Date;
-    endDatetime: Date;
-    organizerId: string;
-    attendees: IRSVP[];
-    createdAt: Date;
-    updatedAt: Date;
+// TODO
+// export class Event implements IEvent {
+    // id: number;
+    // title: string;
+    // description: string;
+    // location: string;
+    // capacity: number | null;
+    // status: EventStatus;
+    // startDatetime: Date;
+    // endDatetime: Date;
+    // organizerId: string;
+    // attendees: IRSVP[];
+    // createdAt: Date;
+    // updatedAt: Date;
   
-    constructor(id: number, data: CreateEventData) {
-        const title = normalize(data.title);
-        const description = normalize(data.description);
-        const location = normalize(data.location);
-        const capacity = 
+    // constructor(id: number, data: CreateEventData) {
+    //     const title = normalize(data.title);
+    //     const description = normalize(data.description);
+    //     const location = normalize(data.location);
+    //     const capacity = 
   
-        this.id = id;
-        this.title = title;
-        this.description = description;
+    //     this.id = id;
+    //     this.title = title;
+    //     this.description = description;
 
-        // TODO
+        
         // this.location: location;
         // category: string;
         // status: EventStatus;
@@ -96,5 +93,5 @@ export class Event implements IEvent {
         // attendees: IRSVP[];
         // createdAt: Date;
         // updatedAt: Date;
-    }
-}
+//     }
+// }
