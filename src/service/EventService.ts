@@ -261,7 +261,8 @@ class EventService implements IEventService {
       
         const allowed = this.canRsvp(event);
         if (!allowed.ok) {
-            return allowed;
+            // TODO: change error
+            return Err(EventNotFoundError(allowed.value.message));
         }
       
         const existing = await this.eventRepository.findUserRsvp(eventId, userId);
