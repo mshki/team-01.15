@@ -2,10 +2,11 @@ import { EventNotFoundError } from "../lib/errors";
 import { Err, Ok, type Result } from "../lib/result";
 import type { EventError } from "../lib/errors";
 import type { IEventRepository } from "./EventRepository";
-import type { IEvent } from "../types/EventTypes";
+import { CreateEventData, Event, type IEvent } from "../types/EventTypes";
 
 class InMemoryEventRepository implements IEventRepository {
     private events = new Map<number, IEvent>();
+    private nextId = 1;
 
     async getAllEvents(): Promise<Result<IEvent[], EventError>> {
         return Ok(Array.from(this.events.values()));
@@ -19,9 +20,10 @@ class InMemoryEventRepository implements IEventRepository {
         return Ok(event);
     }
 
-    async createEvent(event: IEvent): Promise<Result<IEvent, EventError>> {
-        this.events.set(event.id, event);
-        return Ok(event);
+    async createEvent(event: CreateEventData): Promise<Result<IEvent, EventError>> {
+        const newEvent = new Event(this.nextId++, event);
+        this.events.set(newEvent.id, newEvent);
+        return Ok(newEvent);
     }
 
     async updateEvent(id: number, updates: Partial<IEvent>): Promise<Result<IEvent, EventError>> {
