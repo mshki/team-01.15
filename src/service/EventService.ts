@@ -1,6 +1,6 @@
 import { permission } from "node:process";
-import { AuthorizationRequired, ValidationError } from "../auth/errors";
-import { EventError, EventNotFoundError } from "../lib/errors";
+import { AuthError, AuthorizationRequired } from "../auth/errors";
+import { EventError, EventNotFoundError, ValidationError } from "../lib/errors";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
 import { IAuthenticatedUserSession } from "../session/AppSession";
@@ -10,7 +10,7 @@ import { ILoggingService } from "./LoggingService";
 export interface IEventService {
     createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
-    getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError>>;
+    getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError | AuthError>>;
     updateEvent(eventId: number, 
         user: IAuthenticatedUserSession, 
         title: string,
@@ -24,7 +24,7 @@ export interface IEventService {
 class EventService implements IEventService {
     constructor(private readonly eventRepository: IEventRepository, private readonly logger: ILoggingService) {}
 
-    private canEditEvent(event: IEvent, user: IAuthenticatedUserSession): Result<void> {
+    private canEditEvent(event: IEvent, user: IAuthenticatedUserSession): Result<null, EventError | AuthError> {
         const isAdmin = user.role === "admin";
         const isOwner = event.organizerId === user.userId;
     
@@ -45,7 +45,7 @@ class EventService implements IEventService {
             return Err(ValidationError("Past events cannot be edited."));
         }
     
-        return Ok(undefined);
+        return Ok(null);
     }
 
     async createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
@@ -56,7 +56,7 @@ class EventService implements IEventService {
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
 
-    async getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError>> {
+    async getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError | AuthError>> {
         const event = await this.eventRepository.getEventById(eventId);
 
         if (event.ok) {
@@ -70,8 +70,33 @@ class EventService implements IEventService {
     }
 
     async updateEvent(eventId: number, user: IAuthenticatedUserSession, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
-        // TODO
-        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
+        const eventResult = await this.getEventEditForm(eventId, user);
+        if (!eventResult.ok) {
+            // TODO: verify error
+          return Err(ValidationError("Cannot edit event."));
+        }
+    
+        const event = eventResult.value;
+        const update: IEvent = {
+            ...event,
+            title: title.trim(),
+            description: description.trim(),
+            location: location.trim(),
+            startDatetime: startDatetime!,
+            endDatetime: endDatetime!,
+            capacity: capacity,
+            updatedAt: new Date(),
+          };
+        const isUpdated = await this.eventRepository.updateEvent(eventId, update);
+        if (!isUpdated) {
+          return Err(EventNotFoundError("Event not found."));
+        } 
+
+        if (!isUpdated.ok) {
+            // Verify this is the correct error type
+            return Err(ValidationError("Failed to update event."))
+        }
+        return Ok(isUpdated.value);
     }
 }
 
