@@ -331,6 +331,39 @@ class ExpressApp implements IApp {
       }),
     );
 
+    // -- Feature 4: RSVP Toggle ————————————————————————————————————————————————
+
+    this.app.post(
+      "/events/:id/rsvp/toggle",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+    
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+          res.status(400).render("events/partials/error", {
+            message: "Invalid ID.",
+            layout: false,
+          });
+          return;
+        }
+    
+        const browserSession = touchAppSession(sessionStore(req));
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+    
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+    
+        await this.controller.toggleRsvp(req, res, id, currentUser, browserSession);
+      }),
+    );
+
     // ── Error handler ────────────────────────────────────────────────
 
     this.app.use((err: unknown, _req: Request, res: Response, _next: (value?: unknown) => void) => {
