@@ -271,6 +271,54 @@ class EventService implements IEventService {
 
         return updatedResult;
     }
+    async filterPublishedEvents(timeframe: string = "all"): Promise<Result<IEvent[], EventError>> {
+        this.logger.info(`Filtering published events with timeframe "${timeframe}"`);
+
+        const allEventsResult = await this.eventRepository.getAllEvents();
+
+        if (!allEventsResult.ok) {
+            return allEventsResult;
+        }
+
+        const now = new Date();
+
+        const publishedUpcomingEvents = allEventsResult.value.filter(
+            (event) =>
+                event.status === "PUBLISHED" &&
+                event.endDatetime.getTime() >= now.getTime()
+        );
+
+        if (timeframe === "all") {
+            return Ok(publishedUpcomingEvents);
+        }
+
+        if (timeframe === "week") {
+            const endOfWeek = new Date(now);
+            endOfWeek.setDate(now.getDate() + 7);
+
+            const filtered = publishedUpcomingEvents.filter(
+                (event) => event.startDatetime.getTime() <= endOfWeek.getTime()
+            );
+
+            return Ok(filtered);
+        }
+
+        if (timeframe === "weekend") {
+            const weekend = this.getUpcomingWeekendRange(now);
+
+            const filtered = publishedUpcomingEvents.filter((event) => {
+                const start = event.startDatetime.getTime();
+                return (
+                    start >= weekend.start.getTime() &&
+                    start <= weekend.end.getTime()
+                );
+            });
+
+            return Ok(filtered);
+        }
+
+        return Err(ValidationError("Invalid timeframe filter"));
+    }
 
 
 }
