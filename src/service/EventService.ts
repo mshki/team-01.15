@@ -55,6 +55,7 @@ class EventService implements IEventService {
 
         // 2. Call repository to create event
         const result = await this.eventRepository.createEvent({ title, description, location, organizerId, startDatetime, endDatetime, capacity, status, attendees });
+        this.logger.info(`Attempted to create event with title "${title}". Result: ${result.ok ? "Success" : "Error"}`);
 
         // 3. Handle repository result and return appropriate response
         return result;
