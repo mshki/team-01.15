@@ -22,6 +22,7 @@ export interface IEvent {
     title: string,
     description: string,
     location: string,
+    category?: string | null,
     capacity: number | null,
     status: EventStatus;
     startDatetime: Date,
@@ -36,6 +37,7 @@ export interface CreateEventData {
     title: string,
     description: string,
     location: string,
+    category?: string | null,
     capacity?: number | null,
     status: EventStatus;
     startDatetime: Date,
