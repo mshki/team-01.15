@@ -22,6 +22,7 @@ export interface IEvent {
     title: string,
     description: string,
     location: string,
+    category?: string | null,
     capacity: number | null,
     status: EventStatus;
     startDatetime: Date,
@@ -36,6 +37,7 @@ export interface CreateEventData {
     title: string,
     description: string,
     location: string,
+    category?: string | null,
     capacity?: number | null,
     status: EventStatus;
     startDatetime: Date,
@@ -62,6 +64,7 @@ export class Event implements IEvent {
     title: string;
     description: string;
     location: string;
+    category?: string | null;
     capacity: number | null;
     status: EventStatus;
     startDatetime: Date;
@@ -75,12 +78,14 @@ export class Event implements IEvent {
         const title = normalize(data.title);
         const description = normalize(data.description);
         const location = normalize(data.location);
+        const category = data.category ? normalize(data.category) : null;
         const capacity = data.capacity ?? null;
 
         this.id = id;
         this.title = title;
         this.description = description;
         this.location = location;
+        this.category = category;
         this.capacity = capacity;
         this.status = data.status;
         this.startDatetime = data.startDatetime;
