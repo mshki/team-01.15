@@ -286,7 +286,7 @@ class ExpressApp implements IApp {
           });
           return;
         } else {
-          await this.controller.editFromForm(res, id, currentUser, browserSession);
+          await this.controller.editFromForm(res, id, browserSession);
         }
       }),
     )
