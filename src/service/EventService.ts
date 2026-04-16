@@ -252,8 +252,85 @@ class EventService implements IEventService {
     }
 
     async toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>> {
-        // TODO
-        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
+        const getEvent = await this.eventRepository.getEventById(eventId);
+        if (!getEvent.ok) {
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        }
+        const event = getEvent.value
+      
+        const allowed = this.canRsvp(event);
+        if (!allowed.ok) {
+            return allowed;
+        }
+      
+        const existing = await this.eventRepository.findUserRsvp(eventId, userId);
+      
+        let updatedRsvp: IRSVP;
+      
+        if (!existing.ok) {
+            const status = this.nextJoinStatus(event);
+      
+            updatedRsvp = {
+                id: `rsvp_${eventId}_${userId}_${Date.now().toString(36)}`,
+                eventId,
+                userId,
+                rsvpStatus: status,
+                createdAt: new Date(),
+            };
+      
+            event.attendees.push(updatedRsvp);
+            return Ok(updatedRsvp);
+        } 
+
+        const currRsvp = existing.value
+        if (currRsvp.rsvpStatus === "CANCELLED") {
+            const status = this.nextJoinStatus(event);
+        
+            updatedRsvp = {
+                ...currRsvp,
+                rsvpStatus: status,
+            };
+      
+            const idx = event.attendees.findIndex(
+                (r) => r.eventId === eventId && r.userId === userId
+            );
+      
+            if (idx >= 0) {
+                event.attendees[idx] = updatedRsvp;
+            } else {
+                event.attendees.push(updatedRsvp);
+            }
+            } else {
+            const wasGoing = currRsvp.rsvpStatus === "GOING";
+        
+            updatedRsvp = {
+                ...currRsvp,
+                rsvpStatus: "CANCELLED",
+            };
+        
+            const idx = event.attendees.findIndex(
+                (r) => r.eventId === eventId && r.userId === userId
+            );
+      
+            if (idx >= 0) {
+                event.attendees[idx] = updatedRsvp;
+            } else {
+                event.attendees.push(updatedRsvp);
+            }
+        
+            if (wasGoing) {
+                this.promoteWaitlistedIfPossible(event);
+            }
+        }
+      
+        event.updatedAt = new Date();
+      
+        const saved = await this.eventRepository.updateEvent(event.id, event);
+        if (!saved) {
+            return Err(ValidationError("Unable to save RSVP changes."));
+        }
+      
+        return Ok(updatedRsvp);
     }
     async publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>> {
         this.logger.info(`User ${userId} is publishing event ${eventId}`);
