@@ -100,7 +100,7 @@ class EventController implements IEventController {
         }
 
         // 3. Handle service result and return appropriate response
-        res.redirect("/events");
+        res.redirect("/home");
     }
 
     async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
