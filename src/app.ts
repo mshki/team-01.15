@@ -19,6 +19,7 @@ import {
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
 import { IEvent } from "./types/EventTypes";
+import { IEventService } from "./service/EventService";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -39,6 +40,7 @@ class ExpressApp implements IApp {
     private readonly controller: IEventController,
     private readonly authController: IAuthController,
     private readonly logger: ILoggingService,
+    private readonly eventService: IEventService,
   ) {
     this.app = express();
     this.registerMiddleware();
@@ -397,6 +399,39 @@ class ExpressApp implements IApp {
         await this.controller.toggleRsvpFromForm(res, id, currentUser, browserSession);
       }),
     );
+    // ── Feature 10: Event Search ─────────────────────────────────────────────────
+
+    // GET /events/search
+    // Renders the search page. Empty query returns all published upcoming events.
+this.app.get(
+    "/events/search",
+    asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) return;
+
+        const store = sessionStore(req);
+        const query = typeof req.query.q === "string" ? req.query.q : "";
+
+        const result = await this.eventService.searchEvents(query);
+
+        if (!result.ok) {
+            res.status(500).render("partials/error", {
+                message: result.error.message,
+                layout: false,
+            });
+            return;
+        }
+
+        const browserSession = recordPageView(store);
+        res.render("event-search", {
+            session: browserSession,
+            query,
+            events: result.value,
+            pageError: null,
+        });
+    }),
+);
+
+ 
 
     // ── Error handler ────────────────────────────────────────────────
 
@@ -524,6 +559,8 @@ export function CreateApp(
   controller: IEventController,
   authController: IAuthController,
   logger: ILoggingService,
+  waitlistService: IWaitlistService,
+  eventService: IEventService,
 ): IApp {
-  return new ExpressApp(controller, authController, logger);
+  return new ExpressApp(authController, logger, waitlistService, eventService);
 }
