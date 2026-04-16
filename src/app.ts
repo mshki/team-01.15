@@ -361,8 +361,8 @@ class ExpressApp implements IApp {
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
           // TOOD: discuss logic for start and end date times 
-          req.body.startDatetime instanceof Date ? req.body.startDatetime : null,
-          req.body.endDatetime instanceof Date ? req.body.endDatetime : null,
+          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
+          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
           browserSession);
       }),
