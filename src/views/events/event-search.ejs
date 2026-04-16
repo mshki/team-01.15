@@ -1,0 +1,42 @@
+<div class="event-search">
+  <h1>Search Events</h1>
+
+  <form method="GET" action="/events/search">
+    <input
+      type="text"
+      name="q"
+      value="<%= query %>"
+      placeholder="Search by title, location, category..."
+      autofocus
+    />
+    <button type="submit">Search</button>
+  </form>
+
+  <% if (query) { %>
+    <p class="result-summary">
+      <%= events.length %> result<%= events.length !== 1 ? 's' : '' %> for "<%= query %>"
+    </p>
+  <% } else { %>
+    <p class="result-summary">Showing all upcoming events</p>
+  <% } %>
+
+  <% if (events.length === 0) { %>
+    <p class="no-results">No events found. Try a different search.</p>
+  <% } else { %>
+    <ul class="event-list">
+      <% events.forEach(function(event) { %>
+        <li class="event-card">
+          <a href="/events/<%= event.id %>">
+            <h2><%= event.eventDesc.title %></h2>
+          </a>
+          <p class="event-meta">
+            <%= event.eventDesc.category %> &middot;
+            <%= event.eventDesc.location %> &middot;
+            <%= new Date(event.eventDesc.datetime).toLocaleDateString() %>
+          </p>
+          <p class="event-desc"><%= event.eventDesc.desc %></p>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</div>
