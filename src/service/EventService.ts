@@ -4,7 +4,7 @@ import { EventError, EventNotFoundError, ValidationError } from "../lib/errors";
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
-import { CreateEventData, IEvent } from "../types/EventTypes";
+import { CreateEventData, IEvent, IRSVP } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 
 export interface IEventService {
@@ -19,6 +19,7 @@ export interface IEventService {
         startDatetime: Date,
         endDatetime: Date,
         capacity: number): Promise<Result<IEvent, EventError>>;
+    toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>>;
 }
 
 class EventService implements IEventService {
@@ -89,7 +90,26 @@ class EventService implements IEventService {
     }
 
     async getEventDetails(eventId: number): Promise<Result<IEvent, EventError>> {
-        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
+        // 1. Validate event ID
+        if (!eventId || eventId <= 0) {
+            return Err(ValidationError("Invalid event ID."));
+        }
+
+        // 2. Call repository to get event details
+        this.logger.info(`Fetching details for event ID ${eventId}`);
+
+        const result = await this.eventRepository.getEventById(eventId);
+        this.logger.info(`Fetch event details result for ID ${eventId}: ${result.ok ? "Success" : "Error"}`);
+
+        if (!result.ok) {
+            if (result.value.name === "EventNotFoundError") {
+                return Err(EventNotFoundError(`Event with ID ${eventId} not found.`));
+            }
+            return Err(result.value);
+        }
+
+        // 3. Handle repository result and return appropriate response
+        return Ok(result.value);
     }
 
     async getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError | AuthError>> {
@@ -155,6 +175,11 @@ class EventService implements IEventService {
             return Err(ValidationError("Failed to update event."))
         }
         return Ok(isUpdated.value);
+    }
+
+    async toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>> {
+        // TODO
+        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
 }
 
