@@ -89,7 +89,12 @@ class EventService implements IEventService {
     }
 
     async getEventDetails(eventId: number): Promise<Result<IEvent, EventError>> {
-        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
+        // 1. Validate event ID
+
+        // 2. Call repository to get event details
+
+        // 3. Handle repository result and return appropriate response
+        return this.eventRepository.getEventById(eventId);
     }
 
     async getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError | AuthError>> {
