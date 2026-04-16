@@ -2,16 +2,17 @@ import { EventNotFoundError } from "../lib/errors";
 import { Err, Ok, type Result } from "../lib/result";
 import type { EventError } from "../lib/errors";
 import type { IEventRepository } from "./EventRepository";
-import type { IEvent } from "../types/EventTypes";
+import { CreateEventData, Event, type IEvent } from "../types/EventTypes";
 
 class InMemoryEventRepository implements IEventRepository {
-    private events = new Map<string, IEvent>();
+    private events = new Map<number, IEvent>();
+    private nextId = 1;
 
     async getAllEvents(): Promise<Result<IEvent[], EventError>> {
         return Ok(Array.from(this.events.values()));
     }
 
-    async getEventById(id: string): Promise<Result<IEvent, EventError>> {
+    async getEventById(id: number): Promise<Result<IEvent, EventError>> {
         const event = this.events.get(id);
         if (!event) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
@@ -19,12 +20,13 @@ class InMemoryEventRepository implements IEventRepository {
         return Ok(event);
     }
 
-    async createEvent(event: IEvent): Promise<Result<IEvent, EventError>> {
-        this.events.set(String(event.id), event);
-        return Ok(event);
+    async createEvent(event: CreateEventData): Promise<Result<IEvent, EventError>> {
+        const newEvent = new Event(this.nextId++, event);
+        this.events.set(newEvent.id, newEvent);
+        return Ok(newEvent);
     }
 
-    async updateEvent(id: string, updates: Partial<IEvent>): Promise<Result<IEvent, EventError>> {
+    async updateEvent(id: number, updates: Partial<IEvent>): Promise<Result<IEvent, EventError>> {
         const event = this.events.get(id);
         if (!event) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
@@ -34,7 +36,7 @@ class InMemoryEventRepository implements IEventRepository {
         return Ok(updated);
     }
 
-    async deleteEvent(id: string): Promise<Result<void, EventError>> {
+    async deleteEvent(id: number): Promise<Result<void, EventError>> {
         if (!this.events.has(id)) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
         }

@@ -15,7 +15,7 @@ export interface IEventController {
         capacity: number,
         session: IAppBrowserSession
     ): Promise<void>;
-    showEventDetails(res: Response, eventId: string, session: IAppBrowserSession): Promise<void>;
+    showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
     getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void>;
     editFromForm(
         res: Response, 
@@ -63,7 +63,7 @@ class EventController implements IEventController {
         return;
     }
 
-    async showEventDetails(res: Response, eventId: string, session: IAppBrowserSession): Promise<void> {
+    async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
         return;
     }
 
