@@ -36,6 +36,7 @@ export interface IEventController {
         user: IAuthenticatedUserSession,
         session: IAppBrowserSession
         ): Promise<void>;
+    filterEventsFromQuery(res: Response, timeframe: string, session: IAppBrowserSession): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -213,6 +214,39 @@ class EventController implements IEventController {
         }
     
         res.redirect(`/events/${eventId}`);
+    }
+    async filterEventsFromQuery(
+        res: Response,
+        timeframe: string,
+        session: IAppBrowserSession
+    ): Promise<void> {
+        this.logger.info(`Filtering events with timeframe "${timeframe}"`);
+
+        const result = await this.eventService.filterPublishedEvents(timeframe);
+        
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            res.status(status).render("events/partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("events/partials/error", {
+                message: "Unable to filter events.",
+                layout: false,
+            });
+            return;
+        }
+
+        res.render("events/index", {
+            events: result.value,
+            timeframe,
+            session,
+            pageError: null,
+        });
     }
 }
 
