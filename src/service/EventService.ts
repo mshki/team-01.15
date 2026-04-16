@@ -22,7 +22,11 @@ class EventService implements IEventService {
     constructor(private readonly eventRepository: IEventRepository, private readonly logger: ILoggingService) {}
 
     async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
-        
+        // TODO:
+
+        // 1. Validate input data (e.g. check required fields, validate datetime formats, etc.)
+        // 2. Call repository to create event
+        // 3. Handle repository result and return appropriate response
 
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
     }
