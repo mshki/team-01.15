@@ -5,13 +5,13 @@ import type { IEventRepository } from "./EventRepository";
 import type { IEvent } from "../types/EventTypes";
 
 class InMemoryEventRepository implements IEventRepository {
-    private events = new Map<string, IEvent>();
+    private events = new Map<number, IEvent>();
 
     async getAllEvents(): Promise<Result<IEvent[], EventError>> {
         return Ok(Array.from(this.events.values()));
     }
 
-    async getEventById(id: string): Promise<Result<IEvent, EventError>> {
+    async getEventById(id: number): Promise<Result<IEvent, EventError>> {
         const event = this.events.get(id);
         if (!event) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
@@ -20,11 +20,11 @@ class InMemoryEventRepository implements IEventRepository {
     }
 
     async createEvent(event: IEvent): Promise<Result<IEvent, EventError>> {
-        this.events.set(String(event.id), event);
+        this.events.set(event.id, event);
         return Ok(event);
     }
 
-    async updateEvent(id: string, updates: Partial<IEvent>): Promise<Result<IEvent, EventError>> {
+    async updateEvent(id: number, updates: Partial<IEvent>): Promise<Result<IEvent, EventError>> {
         const event = this.events.get(id);
         if (!event) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
@@ -34,7 +34,7 @@ class InMemoryEventRepository implements IEventRepository {
         return Ok(updated);
     }
 
-    async deleteEvent(id: string): Promise<Result<void, EventError>> {
+    async deleteEvent(id: number): Promise<Result<void, EventError>> {
         if (!this.events.has(id)) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
         }

@@ -7,8 +7,8 @@ import { IEvent, } from "../types/EventTypes";
 
 export interface IEventRepository {
     getAllEvents(): Promise<Result<IEvent[], EventError>>;
-    getEventById(id: string): Promise<Result<IEvent, EventError>>;
+    getEventById(id: number): Promise<Result<IEvent, EventError>>;
     createEvent(event: IEvent): Promise<Result<IEvent, EventError>>;
-    updateEvent(id: string, event: Partial<IEvent>): Promise<Result<IEvent, EventError>>;
-    deleteEvent(id: string): Promise<Result<void, EventError>>;
+    updateEvent(id: number, event: Partial<IEvent>): Promise<Result<IEvent, EventError>>;
+    deleteEvent(id: number): Promise<Result<void, EventError>>;
 }
