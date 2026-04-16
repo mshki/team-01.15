@@ -454,6 +454,68 @@ class ExpressApp implements IApp {
         );
       }),
     );
+    this.app.post(
+      "/events/:id/publish",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+
+        const eventId = Number(req.params.id);
+        if (!Number.isInteger(eventId) || eventId <= 0) {
+          res.status(400).render("partials/error", {
+            message: "Invalid event ID.",
+            layout: false,
+          });
+          return;
+        }
+
+        await this.controller.publishFromForm(res, eventId, currentUser.userId);
+      }),
+    );
+
+    this.app.post(
+      "/events/:id/cancel",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const currentUser = getAuthenticatedUser(sessionStore(req));
+        if (!currentUser) {
+          res.status(401).render("partials/error", {
+            message: AuthenticationRequired("Please log in to continue.").message,
+            layout: false,
+          });
+          return;
+        }
+
+        const eventId = Number(req.params.id);
+        if (!Number.isInteger(eventId) || eventId <= 0) {
+          res.status(400).render("partials/error", {
+            message: "Invalid event ID.",
+            layout: false,
+          });
+          return;
+        }
+
+        await this.controller.cancelFromForm(
+          res,
+          eventId,
+          currentUser.userId,
+          currentUser.role === "admin",
+        );
+      }),
+    );
   }
 
   getExpressApp(): express.Express {
