@@ -6,6 +6,16 @@ import { EventError } from "../lib/errors";
 import { IApp } from "../contracts";
 
 export interface IEventController {
+    showEventForm(res: Response, session: IAppBrowserSession): Promise<void>;
+    newEventFromForm(res: Response, 
+        name: string,
+        description: string,
+        location: string,
+        datetime: string,
+        capacity: number,
+        session: IAppBrowserSession
+    ): Promise<void>;
+    showEventDetails(res: Response, eventId: string, session: IAppBrowserSession): Promise<void>;
     getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void>;
     editFromForm(
         res: Response, 
@@ -31,20 +41,43 @@ class EventController implements IEventController {
             "message" in value
         );
     }
-
-    private mapErrorStatus(error: EventError): number {
-        // TODO: verify mapping
-        if (error.name === "EventNotFoundError") return 404;
-        if (error.name === "ValidationError") return 400;
-        return 500;
-    }
     
+    async showEventForm(res: Response, session: IAppBrowserSession): Promise<void> {
+        return;
+    }
+
+    async newEventFromForm(res: Response, 
+        name: string,
+        description: string,
+        location: string,
+        datetime: string,
+        capacity: number,
+        session: IAppBrowserSession
+    ): Promise<void> {
+        return;
+    }
+
+    async showEventDetails(res: Response, eventId: string, session: IAppBrowserSession): Promise<void> {
+        return;
+    }
+
     async getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
         // TODO
+        return;
     }
 
-    async editFromForm(res: Response, id: number, user: IAuthenticatedUserSession, name: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number, session: IAppBrowserSession): Promise<void> {
-        // TODO
+    async editFromForm(
+        res: Response, 
+        id: number, 
+        user: IAuthenticatedUserSession, 
+        name: string, 
+        description: string, 
+        location: string, 
+        startDatetime: Date, 
+        endDatetime: Date, 
+        capacity: number, 
+        session: IAppBrowserSession): Promise<void> {
+        
     }
 
 }

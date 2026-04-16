@@ -5,6 +5,10 @@ import https from "node:https";
 import path from "node:path";
 import type { IApp, IServer } from "./contracts";
 import { createComposedApp } from "./composition";
+import { CreateLoggingService } from "./service/LoggingService";
+import { createInMemoryEventRepository } from "./repository/InMemoryEventRepository";
+import { createEventService } from "./service/EventService";
+import { createEventController } from "./controllers/EventController";
 
 export class HttpServer implements IServer {
   constructor(private readonly app: IApp) {}
@@ -40,8 +44,13 @@ export class HttpServer implements IServer {
   }
 }
 
+const logger = CreateLoggingService();
+const eventRepository = createInMemoryEventRepository();
+const eventService = createEventService(eventRepository, logger);
+const eventController = createEventController(eventService, logger);
+
 const port = Number(process.env.HTTPS_PORT ?? process.env.PORT ?? 3443);
-const app = createComposedApp();
+const app = createComposedApp(eventController, logger);
 const server = new HttpServer(app);
 
 server.start(port);
