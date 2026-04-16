@@ -1,14 +1,16 @@
+import { EventError, EventNotFoundError, ValidationError } from "../lib/errors";
+import { Err, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
-import { ILoggingService } from "./LoggingService";
-import { Err, Result } from "../lib/result"; 
-import { EventError, ValidationError } from "../lib/errors";
 import { IEvent } from "../types/EventTypes";
+import { ILoggingService } from "./LoggingService";
 
 
 
 export interface IEventService {
     publishEvent(eventId: string, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: string, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
+    createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>>;
+    getEventDetails(eventId: string): Promise<Result<IEvent, EventError>>;
 }
 
 class EventService implements IEventService {
@@ -25,26 +27,25 @@ class EventService implements IEventService {
 
         const event = eventResult.value;
 
-        if (event.eventDesc.organizerId !== userId) {
+        if (event.organizerId !== userId) {
             this.logger.info(`Publish denied for user ${userId} on event ${eventId}: not organizer`);
             return Err(ValidationError("Only the organizer can publish this event"));
         }
 
-        if (event.eventDesc.status !== "DRAFT") {
-            this.logger.info(`Publish denied for event ${eventId}: status is ${event.eventDesc.status}`);
+        if (event.status !== "DRAFT") {
+            this.logger.info(`Publish denied for event ${eventId}: status is ${event.status}`);
             return Err(ValidationError("Only draft events can be published"));
         }
 
         const updatedResult = await this.eventRepository.updateEvent(eventId, {
-            eventDesc: {
-                ...event.eventDesc,
-                status: "PUBLISHED",
-            },
+            status: "PUBLISHED",
+            updatedAt: new Date(),
         });
 
         if (updatedResult.ok) {
             this.logger.info(`Event ${eventId} published successfully`);
         }
+
         return updatedResult;
     }
 
@@ -62,31 +63,38 @@ class EventService implements IEventService {
         }
 
         const event = eventResult.value;
-        const isOrganizer = event.eventDesc.organizerId === userId;
+        const isOrganizer = event.organizerId === userId;
 
         if (!isOrganizer && !isAdmin) {
             this.logger.info(`Cancel denied for user ${userId} on event ${eventId}: not organizer or admin`);
             return Err(ValidationError("Only the organizer or an admin can cancel this event"));
         }
 
-        if (event.eventDesc.status !== "PUBLISHED") {
-            this.logger.info(`Cancel denied for event ${eventId}: status is ${event.eventDesc.status}`);
+        if (event.status !== "PUBLISHED") {
+            this.logger.info(`Cancel denied for event ${eventId}: status is ${event.status}`);
             return Err(ValidationError("Only published events can be cancelled"));
         }
 
         const updatedResult = await this.eventRepository.updateEvent(eventId, {
-            eventDesc: {
-                ...event.eventDesc,
-                status: "CANCELLED",
-            },
+            status: "CANCELLED",
+            updatedAt: new Date(),
         });
 
         if (updatedResult.ok) {
             this.logger.info(`Event ${eventId} cancelled successfully`);
         }
+
         return updatedResult;
     }
 
+
+    async createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
+        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
+    }
+
+    async getEventDetails(eventId: string): Promise<Result<IEvent, EventError>> {
+        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
+    }
 }
 
 export function createEventService(eventRepository: IEventRepository, logger: ILoggingService): IEventService {
