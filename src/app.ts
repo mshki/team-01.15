@@ -403,33 +403,33 @@ class ExpressApp implements IApp {
 
     // GET /events/search
     // Renders the search page. Empty query returns all published upcoming events.
-this.app.get(
-    "/events/search",
-    asyncHandler(async (req, res) => {
-        if (!this.requireAuthenticated(req, res)) return;
+    // this.app.get(
+    //     "/events/search",
+    //     asyncHandler(async (req, res) => {
+    //         if (!this.requireAuthenticated(req, res)) return;
 
-        const store = sessionStore(req);
-        const query = typeof req.query.q === "string" ? req.query.q : "";
+    //         const store = sessionStore(req);
+    //         const query = typeof req.query.q === "string" ? req.query.q : "";
 
-        const result = await this.eventService.searchEvents(query);
+    //         const result = await this.eventService.searchEvents(query);
 
-        if (!result.ok) {
-            res.status(500).render("partials/error", {
-                message: result.error.message,
-                layout: false,
-            });
-            return;
-        }
+    //         if (!result.ok) {
+    //             res.status(500).render("partials/error", {
+    //                 message: result.error.message,
+    //                 layout: false,
+    //             });
+    //             return;
+    //         }
 
-        const browserSession = recordPageView(store);
-        res.render("event-search", {
-            session: browserSession,
-            query,
-            events: result.value,
-            pageError: null,
-        });
-    }),
-);
+    //         const browserSession = recordPageView(store);
+    //         res.render("event-search", {
+    //             session: browserSession,
+    //             query,
+    //             events: result.value,
+    //             pageError: null,
+    //         });
+    //     }),
+    // );
 
  
 
@@ -559,8 +559,7 @@ export function CreateApp(
   controller: IEventController,
   authController: IAuthController,
   logger: ILoggingService,
-  waitlistService: IWaitlistService,
   eventService: IEventService,
 ): IApp {
-  return new ExpressApp(authController, logger, waitlistService, eventService);
+  return new ExpressApp(controller, authController, logger, eventService);
 }
