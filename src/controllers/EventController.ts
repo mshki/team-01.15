@@ -71,12 +71,6 @@ class EventController implements IEventController {
             return;
         }
 
-        if (session.authenticatedUser.role === "user") {
-            this.logger.warn(`User ${session.authenticatedUser.userId} attempted to create event without permission.`);
-            res.status(403);
-            return;
-        }
-
         // 1. Construct createEventData
         const data = {
             title: name,
