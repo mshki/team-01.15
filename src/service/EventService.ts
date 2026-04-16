@@ -1,5 +1,6 @@
+import { AuthorizationRequired, ValidationError } from "../auth/errors";
 import { EventError, EventNotFoundError } from "../lib/errors";
-import { Result } from "../lib/result";
+import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { IEvent } from "../types/EventTypes";
@@ -21,6 +22,30 @@ export interface IEventService {
 
 class EventService implements IEventService {
     constructor(private readonly eventRepository: IEventRepository, private readonly logger: ILoggingService) {}
+
+    private canEditEvent(event: IEvent, user: IAuthenticatedUserSession): Result<void> {
+        const isAdmin = user.role === "admin";
+        const isOwner = event.organizerId === user.userId;
+    
+        if (user.role === "user" && !isOwner) {
+            return Err(AuthorizationRequired("Only owner can edit events."));
+        }
+    
+        if (!isAdmin && !isOwner) {
+            return Err(AuthorizationRequired("Need permission to edit this event."));
+        }
+    
+        const now = new Date();
+        if (event.status === "CANCELLED" || event.status === "CONCLUDED") {
+            return Err(ValidationError("Cancelled or concluded events cannot be edited."));
+        }
+    
+        if (event.endDatetime.getTime() < now.getTime()) {
+            return Err(ValidationError("Past events cannot be edited."));
+        }
+    
+        return Ok(undefined);
+      }
 
     async createEvent(organizerId: string, eventName: string, eventDesc: string, location: string, datetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
         return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
