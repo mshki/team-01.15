@@ -52,19 +52,19 @@ class EventService implements IEventService {
     
         return Ok(null);
     }
-    async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
-        this.logger.info(`searchEvents called with query: "${query}"`);
+    // async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+    //     this.logger.info(`searchEvents called with query: "${query}"`);
 
-        const result = await this.eventRepository.searchEvents(query);
+    //     const result = await this.eventRepository.searchEvents(query);
 
-        if (!result.ok) {
-            this.logger.warn(`searchEvents failed: ${result.value.message}`);
-            return result;
-        }
+    //     if (!result.ok) {
+    //         this.logger.warn(`searchEvents failed: ${result.error.message}`);
+    //         return result;
+    //     }
 
-        this.logger.info(`searchEvents returned ${result.value.length} results`);
-        return result;
-    }
+    //     this.logger.info(`searchEvents returned ${result.value.length} results`);
+    //     return result;
+    // }
 
 
     private canRsvp(event: IEvent): Result<void, EventError> {
