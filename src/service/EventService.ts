@@ -281,47 +281,46 @@ class EventService implements IEventService {
             };
       
             event.attendees.push(updatedRsvp);
-            return Ok(updatedRsvp);
-        } 
-
-        const currRsvp = existing.value
-        if (currRsvp.rsvpStatus === "CANCELLED") {
-            const status = this.nextJoinStatus(event);
-        
-            updatedRsvp = {
-                ...currRsvp,
-                rsvpStatus: status,
-            };
-      
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
-            );
-      
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
-            } else {
-                event.attendees.push(updatedRsvp);
-            }
-            } else {
-            const wasGoing = currRsvp.rsvpStatus === "GOING";
-        
-            updatedRsvp = {
-                ...currRsvp,
-                rsvpStatus: "CANCELLED",
-            };
-        
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
-            );
-      
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
-            } else {
-                event.attendees.push(updatedRsvp);
-            }
-        
-            if (wasGoing) {
-                this.promoteWaitlistedIfPossible(event);
+        } else {
+            const currRsvp = existing.value
+            if (currRsvp.rsvpStatus === "CANCELLED") {
+                const status = this.nextJoinStatus(event);
+            
+                updatedRsvp = {
+                    ...currRsvp,
+                    rsvpStatus: status,
+                };
+          
+                const idx = event.attendees.findIndex(
+                    (r) => r.eventId === eventId && r.userId === userId
+                );
+          
+                if (idx >= 0) {
+                    event.attendees[idx] = updatedRsvp;
+                } else {
+                    event.attendees.push(updatedRsvp);
+                }
+                } else {
+                const wasGoing = currRsvp.rsvpStatus === "GOING";
+            
+                updatedRsvp = {
+                    ...currRsvp,
+                    rsvpStatus: "CANCELLED",
+                };
+            
+                const idx = event.attendees.findIndex(
+                    (r) => r.eventId === eventId && r.userId === userId
+                );
+          
+                if (idx >= 0) {
+                    event.attendees[idx] = updatedRsvp;
+                } else {
+                    event.attendees.push(updatedRsvp);
+                }
+            
+                if (wasGoing) {
+                    this.promoteWaitlistedIfPossible(event);
+                }
             }
         }
       
