@@ -52,6 +52,20 @@ class EventService implements IEventService {
     
         return Ok(null);
     }
+    async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+        this.logger.info(`searchEvents called with query: "${query}"`);
+
+        const result = await this.eventRepository.searchEvents(query);
+
+        if (!result.ok) {
+            this.logger.warn(`searchEvents failed: ${result.error.message}`);
+            return result;
+        }
+
+        this.logger.info(`searchEvents returned ${result.value.length} results`);
+        return result;
+    }
+
 
     async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
         // 1. Validate input data
@@ -255,6 +269,7 @@ class EventService implements IEventService {
 
         return updatedResult;
     }
+
 
 }
 
