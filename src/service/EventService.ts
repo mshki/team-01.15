@@ -24,6 +24,7 @@ export interface IEventService {
     toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>>;
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
+    filterPublishedEvents(timeframe?: string): Promise<Result<IEvent[], EventError>>;
 }
 
 class EventService implements IEventService {
