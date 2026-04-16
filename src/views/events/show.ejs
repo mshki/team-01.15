@@ -65,7 +65,7 @@
           </form>
         <% } %>
 
-        <% if (event.status !== 'CANCELLED' && event.status !== 'CONCLUDED') { %>
+        <% if (event.status === 'PUBLISHED') { %>
         <form method="post" action="/events/<%= event.id %>/cancel">
           <button
             type="submit"
