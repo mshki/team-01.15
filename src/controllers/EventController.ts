@@ -38,9 +38,14 @@ export interface IEventController {
         user: IAuthenticatedUserSession,
         session: IAppBrowserSession
         ): Promise<void>;
-    
     publishFromForm(res: Response, eventId: number, userId: string): Promise<void>;
     cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void>;
+    filterEventsFromQuery(
+        res: Response,
+        timeframe: string,
+        category: string | null,
+        session: IAppBrowserSession
+    ): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -169,7 +174,7 @@ class EventController implements IEventController {
     async getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
         this.logger.info(`Loading edit form for event ${id}`);
 
-        const result = await this.eventService.getEventEditForm(id, user);
+        const result = await this.eventService.getEventEditForm(id, user.userId, user.role);
 
         if (!result.ok && this.isEventError(result.value)) {
             const status = this.mapErrorStatus(result.value);
@@ -191,29 +196,30 @@ class EventController implements IEventController {
             return;
         }
         
-        res.render("events/:id/edit", {
+        res.render("events/edit", {
             event: result.value,
             session,
-            layout: false,
         });
     }
 
     async editFromForm(
-        res: Response, 
-        id: number, 
-        user: IAuthenticatedUserSession, 
-        name: string, 
-        description: string, 
-        location: string, 
-        startDatetime: Date, 
-        endDatetime: Date, 
-        capacity: number, 
-        session: IAppBrowserSession): Promise<void> {
-            this.logger.info(`Editing event ${id}`);
-
+        res: Response,
+        id: number,
+        user: IAuthenticatedUserSession,
+        name: string,
+        description: string,
+        location: string,
+        startDatetime: Date,
+        endDatetime: Date,
+        capacity: number,
+        session: IAppBrowserSession
+      ): Promise<void> {
+        this.logger.info(`Editing event ${id}`);
+      
         const result = await this.eventService.updateEvent(
             id, 
-            user, 
+            user.userId, 
+            user.role,
             name,
             description,
             location,
@@ -221,38 +227,51 @@ class EventController implements IEventController {
             endDatetime,
             capacity,
         );
-
+      
         if (!result.ok && this.isEventError(result.value)) {
             const status = this.mapErrorStatus(result.value);
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Edit event failed: ${result.value.message}`);
-
-            res.status(status).render("events/:id/edit", {
-            error: result.value.message,
-            values: {
+        
+            res.status(status).render("events/edit", {
+                event: { id, title: name },
+                pageError: result.value.message,
+                values: {
                 title: name,
                 description,
                 location,
                 startDatetime,
                 endDatetime,
                 capacity,
-            },
-            session,
-            layout: false,
+                },
+                session,
             });
             return;
         }
-
+      
         if (!result.ok) {
-            res.status(500).render("events/partials/error", {
-            message: "Unable to update event.",
-            layout: false,
+            res.status(500).render("partials/error", {
+                message: "Unable to update event.",
+                layout: false,
             });
             return;
         }
 
+        const event = result.value;
+        const currentUser = session.authenticatedUser;
+        const isAdmin = currentUser?.role === "admin";
+        const isOrganizer = currentUser?.userId === event.organizerId;
+
+        if (!isAdmin && !isOrganizer) {
+            res.status(403).render("events/partials/error", {
+                message: "User does not have access to edit this event.",
+                layout: false,
+              });
+              return;
+        }
+      
         res.redirect(`/events/${result.value.id}`);
-    }
+      }
 
     async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
         const result = await this.eventService.toggleRsvp(eventId, user.userId);
@@ -300,7 +319,52 @@ class EventController implements IEventController {
         }
 
         res.redirect(`/events/${eventId}`);
+    }
 
+    async filterEventsFromQuery(
+        res: Response,
+        timeframe: string,
+        category: string | null,
+        session: IAppBrowserSession
+    ): Promise<void> {
+        this.logger.info(
+            `Filtering events with timeframe "${timeframe}" and category "${category ?? "all"}"`
+        );
+
+        const normalizedTimeframe =
+            timeframe === "all" || timeframe === "week" || timeframe === "weekend"
+                ? timeframe
+                : "all";
+
+        const result = await this.eventService.filterPublishedEvents(
+            normalizedTimeframe,
+            category
+        );
+
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            res.status(status).render("events/partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("events/partials/error", {
+                message: "Unable to filter events.",
+                layout: false,
+            });
+            return;
+        }
+    
+        res.render("events/index", {
+            events: result.value,
+            timeframe: normalizedTimeframe,
+            category,
+            session,
+            pageError: null,
+        });
     }
 }
 

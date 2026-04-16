@@ -4,7 +4,7 @@ import { EventError, EventNotFoundError, ValidationError } from "../lib/errors";
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
-import { CreateEventData, IEvent, IRSVP } from "../types/EventTypes";
+import { CreateEventData, IEvent, IRSVP, RSVPStatus } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 
 
@@ -12,9 +12,10 @@ import { ILoggingService } from "./LoggingService";
 export interface IEventService {
     createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
-    getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError | AuthError>>;
+    getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError | AuthError>>;
     updateEvent(eventId: number, 
-        user: IAuthenticatedUserSession, 
+        userId: string,
+        userRole: string,
         title: string,
         description: string,
         location: string,
@@ -24,16 +25,17 @@ export interface IEventService {
     toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>>;
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
+    filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
 }
 
 class EventService implements IEventService {
     constructor(private readonly eventRepository: IEventRepository, private readonly logger: ILoggingService) {}
 
-    private canEditEvent(event: IEvent, user: IAuthenticatedUserSession): Result<null, EventError | AuthError> {
-        const isAdmin = user.role === "admin";
-        const isOwner = event.organizerId === user.userId;
+    private canEditEvent(event: IEvent, userId: string, userRole: string): Result<null, EventError | AuthError> {
+        const isAdmin = userRole=== "admin";
+        const isOwner = event.organizerId === userId;
     
-        if (user.role === "user" && !isOwner) {
+        if (userRole === "user" && !isOwner) {
             return Err(AuthorizationRequired("Only owner can edit events."));
         }
     
@@ -66,6 +68,61 @@ class EventService implements IEventService {
     //     return result;
     // }
 
+
+    private canRsvp(event: IEvent): Result<void, EventError> {
+        if (event.status === "CANCELLED") {
+            return Err(ValidationError("Cancelled events cannot receive RSVPs."));
+        }
+    
+        if (event.status === "CONCLUDED") {
+            return Err(ValidationError("Concluded events cannot receive RSVPs."));
+        }
+    
+        if (event.status !== "PUBLISHED") {
+            return Err(ValidationError("Only published events can receive RSVPs."));
+        }
+    
+        if (event.endDatetime.getTime() < Date.now()) {
+            return Err(ValidationError("Past events cannot receive RSVPs."));
+        }
+    
+        return Ok(undefined);
+    }
+
+    private countGoing(attendees: IRSVP[]): number {
+        return attendees.filter((r) => r.rsvpStatus === "GOING").length;
+      }
+      
+      private nextJoinStatus(event: IEvent): RSVPStatus {
+        if (event.capacity === null) {
+          return "GOING";
+        }
+      
+        const goingCount = this.countGoing(event.attendees);
+        return goingCount < event.capacity ? "GOING" : "WAITLISTED";
+      }
+      
+      private promoteWaitlistedIfPossible(event: IEvent): IRSVP | null {
+        if (event.capacity === null) {
+          return null;
+        }
+      
+        const goingCount = this.countGoing(event.attendees);
+        if (goingCount >= event.capacity) {
+          return null;
+        }
+      
+        const waitlisted = event.attendees
+          .filter((r) => r.rsvpStatus === "WAITLISTED")
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+      
+        if (!waitlisted) {
+          return null;
+        }
+      
+        waitlisted.rsvpStatus = "GOING";
+        return waitlisted;
+      }
 
     async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
         // 1. Validate input data
@@ -131,11 +188,11 @@ class EventService implements IEventService {
         return Ok(result.value);
     }
 
-    async getEventEditForm(eventId: number, user: IAuthenticatedUserSession): Promise<Result<IEvent, EventError | AuthError>> {
+    async getEventEditForm(eventId: number, userId: string, userRole: string): Promise<Result<IEvent, EventError | AuthError>> {
         const event = await this.eventRepository.getEventById(eventId);
 
         if (event.ok) {
-            const permissionCheck = this.canEditEvent(event.value, user);
+            const permissionCheck = this.canEditEvent(event.value, userId, userRole);
             if (permissionCheck.ok) {
                 return Ok(event.value);
             } else return permissionCheck;
@@ -144,8 +201,8 @@ class EventService implements IEventService {
         }
     }
 
-    async updateEvent(eventId: number, user: IAuthenticatedUserSession, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
-        const eventResult = await this.getEventEditForm(eventId, user);
+    async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
+        const eventResult = await this.getEventEditForm(eventId, userId, userRole);
         if (!eventResult.ok) {
             // TODO: verify error
           return Err(ValidationError("Cannot edit event."));
@@ -197,8 +254,86 @@ class EventService implements IEventService {
     }
 
     async toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>> {
-        // TODO
-        return Promise.resolve({ ok: false, value: EventNotFoundError("Not implemented") });
+        const getEvent = await this.eventRepository.getEventById(eventId);
+        if (!getEvent.ok) {
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        }
+        const event = getEvent.value
+      
+        const allowed = this.canRsvp(event);
+        if (!allowed.ok) {
+            // TODO: change error
+            return Err(EventNotFoundError("TODO"));
+        }
+      
+        const existing = await this.eventRepository.findUserRsvp(eventId, userId);
+      
+        let updatedRsvp: IRSVP;
+      
+        if (!existing.ok) {
+            const status = this.nextJoinStatus(event);
+      
+            updatedRsvp = {
+                id: `rsvp_${eventId}_${userId}_${Date.now().toString(36)}`,
+                eventId,
+                userId,
+                rsvpStatus: status,
+                createdAt: new Date(),
+            };
+      
+            event.attendees.push(updatedRsvp);
+            return Ok(updatedRsvp);
+        } 
+
+        const currRsvp = existing.value
+        if (currRsvp.rsvpStatus === "CANCELLED") {
+            const status = this.nextJoinStatus(event);
+        
+            updatedRsvp = {
+                ...currRsvp,
+                rsvpStatus: status,
+            };
+      
+            const idx = event.attendees.findIndex(
+                (r) => r.eventId === eventId && r.userId === userId
+            );
+      
+            if (idx >= 0) {
+                event.attendees[idx] = updatedRsvp;
+            } else {
+                event.attendees.push(updatedRsvp);
+            }
+            } else {
+            const wasGoing = currRsvp.rsvpStatus === "GOING";
+        
+            updatedRsvp = {
+                ...currRsvp,
+                rsvpStatus: "CANCELLED",
+            };
+        
+            const idx = event.attendees.findIndex(
+                (r) => r.eventId === eventId && r.userId === userId
+            );
+      
+            if (idx >= 0) {
+                event.attendees[idx] = updatedRsvp;
+            } else {
+                event.attendees.push(updatedRsvp);
+            }
+        
+            if (wasGoing) {
+                this.promoteWaitlistedIfPossible(event);
+            }
+        }
+      
+        event.updatedAt = new Date();
+      
+        const saved = await this.eventRepository.updateEvent(event.id, event);
+        if (!saved) {
+            return Err(ValidationError("Unable to save RSVP changes."));
+        }
+      
+        return Ok(updatedRsvp);
     }
     async publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>> {
         this.logger.info(`User ${userId} is publishing event ${eventId}`);
@@ -269,6 +404,80 @@ class EventService implements IEventService {
         }
 
         return updatedResult;
+    }
+
+    async filterPublishedEvents(
+        timeframe: string = "all",
+        category: string | null = null
+    ): Promise<Result<IEvent[], EventError>> {
+        this.logger.info(
+            `Filtering published events with timeframe "${timeframe}" and category "${category ?? "all"}"`
+        );
+
+        const allEventsResult = await this.eventRepository.getAllEvents();
+
+        if (!allEventsResult.ok) {
+            return allEventsResult;
+        }
+
+        const now = new Date();
+
+        let filteredEvents = allEventsResult.value.filter(
+            (event) =>
+                event.status === "PUBLISHED" &&
+                event.endDatetime.getTime() >= now.getTime()
+        );
+
+        if (category && category.trim() !== "") {
+            filteredEvents = filteredEvents.filter(
+                (event) => (event.category ?? "").toLowerCase() === category.toLowerCase()
+            );
+        }
+
+        if (timeframe === "all") {
+            return Ok(filteredEvents);
+        }
+
+        if (timeframe === "week") {
+            const endOfWeek = new Date(now);
+            endOfWeek.setDate(now.getDate() + 7);
+
+            return Ok(
+                filteredEvents.filter(
+                    (event) => event.startDatetime.getTime() <= endOfWeek.getTime()
+                )
+            );
+        }
+
+        if (timeframe === "weekend") {
+            const weekend = this.getUpcomingWeekendRange(now);
+
+            return Ok(
+                filteredEvents.filter((event) => {
+                    const start = event.startDatetime.getTime();
+                    return (
+                        start >= weekend.start.getTime() &&
+                        start <= weekend.end.getTime()
+                    );
+                })
+            );
+        }
+
+        return Err(ValidationError("Invalid timeframe filter"));
+    }
+    private getUpcomingWeekendRange(now: Date): { start: Date; end: Date } {
+        const day = now.getDay(); // 0=Sun ... 6=Sat
+        const daysUntilSaturday = day === 6 ? 0 : (6 - day + 7) % 7;
+
+        const saturday = new Date(now);
+        saturday.setDate(now.getDate() + daysUntilSaturday);
+        saturday.setHours(0, 0, 0, 0);
+
+        const sundayEnd = new Date(saturday);
+        sundayEnd.setDate(saturday.getDate() + 1);
+        sundayEnd.setHours(23, 59, 59, 999);
+
+        return { start: saturday, end: sundayEnd };
     }
 
 

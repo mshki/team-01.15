@@ -361,8 +361,8 @@ class ExpressApp implements IApp {
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
           // TOOD: discuss logic for start and end date times 
-          req.body.startDatetime instanceof Date ? req.body.startDatetime : null,
-          req.body.endDatetime instanceof Date ? req.body.endDatetime : null,
+          typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
+          typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,
           browserSession);
       }),
@@ -547,6 +547,30 @@ class ExpressApp implements IApp {
           eventId,
           currentUser.userId,
           currentUser.role === "admin",
+        );
+      }),
+    );
+
+    this.app.get(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        const timeframe =
+          typeof req.query.timeframe === "string" ? req.query.timeframe : "all";
+        const category =
+          typeof req.query.category === "string" && req.query.category.trim() !== ""
+            ? req.query.category
+            : null;
+
+        await this.controller.filterEventsFromQuery(
+          res,
+          timeframe,
+          category,
+          browserSession
         );
       }),
     );

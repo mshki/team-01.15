@@ -2,7 +2,8 @@ import { EventNotFoundError, DatabaseError } from "../lib/errors";
 import { Err, Ok, type Result } from "../lib/result";
 import type { EventError } from "../lib/errors";
 import type { IEventRepository } from "./EventRepository";
-import { CreateEventData, Event, type IEvent } from "../types/EventTypes";
+import { CreateEventData, Event, IRSVP, type IEvent } from "../types/EventTypes";
+import { ValidationError } from "../auth/errors";
 
 class InMemoryEventRepository implements IEventRepository {
     private events = new Map<number, IEvent>();
@@ -42,6 +43,27 @@ class InMemoryEventRepository implements IEventRepository {
         }
         this.events.delete(id);
         return Ok(undefined);
+    }
+
+    async findUserRsvp(id: number, userId: string): Promise<Result<IRSVP, EventError>> {
+        const event = this.events.get(id);
+        if (!event) {
+            return Err(EventNotFoundError(`Event with id ${id} not found`));
+        }
+      
+        const rsvp = event.attendees.find(
+            (attendee) => attendee.eventId === id && attendee.userId === userId
+        );
+      
+        if (!rsvp) {
+            // TODO: fix error logic
+            return Err(EventNotFoundError("TODO"));
+        }
+      
+        return Ok({
+          ...rsvp,
+            createdAt: new Date(rsvp.createdAt),
+        });
     }
 }
 
