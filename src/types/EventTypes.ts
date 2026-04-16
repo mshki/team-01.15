@@ -58,40 +58,37 @@ function normalizeTag(tag?: string): string {
     return normalized || "general";
 }
 
-// TODO
-// export class Event implements IEvent {
-    // id: number;
-    // title: string;
-    // description: string;
-    // location: string;
-    // capacity: number | null;
-    // status: EventStatus;
-    // startDatetime: Date;
-    // endDatetime: Date;
-    // organizerId: string;
-    // attendees: IRSVP[];
-    // createdAt: Date;
-    // updatedAt: Date;
-  
-    // constructor(id: number, data: CreateEventData) {
-    //     const title = normalize(data.title);
-    //     const description = normalize(data.description);
-    //     const location = normalize(data.location);
-    //     const capacity = 
-  
-    //     this.id = id;
-    //     this.title = title;
-    //     this.description = description;
+export class Event implements IEvent {
+    id: number;
+    title: string;
+    description: string;
+    location: string;
+    capacity: number | null;
+    status: EventStatus;
+    startDatetime: Date;
+    endDatetime: Date;
+    organizerId: string;
+    attendees: IRSVP[];
+    createdAt: Date;
+    updatedAt: Date;
 
-        
-        // this.location: location;
-        // category: string;
-        // status: EventStatus;
-        // this.startDatetime: Date;
-        // this.endDatetime: Date;
-        // organizerId: string;
-        // attendees: IRSVP[];
-        // createdAt: Date;
-        // updatedAt: Date;
-//     }
-// }
+    constructor(id: number, data: CreateEventData) {
+        const title = normalize(data.title);
+        const description = normalize(data.description);
+        const location = normalize(data.location);
+        const capacity = data.capacity ?? null;
+
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.location = location;
+        this.capacity = capacity;
+        this.status = data.status;
+        this.startDatetime = data.startDatetime;
+        this.endDatetime = data.endDatetime;
+        this.organizerId = data.organizerId;
+        this.attendees = data.attendees;
+        this.createdAt = data.createdAt ?? new Date();
+        this.updatedAt = data.updatedAt ?? new Date();
+    }
+}
