@@ -319,6 +319,20 @@ class EventService implements IEventService {
 
         return Err(ValidationError("Invalid timeframe filter"));
     }
+    private getUpcomingWeekendRange(now: Date): { start: Date; end: Date } {
+        const day = now.getDay(); // 0=Sun ... 6=Sat
+        const daysUntilSaturday = day === 6 ? 0 : (6 - day + 7) % 7;
+
+        const saturday = new Date(now);
+        saturday.setDate(now.getDate() + daysUntilSaturday);
+        saturday.setHours(0, 0, 0, 0);
+
+        const sundayEnd = new Date(saturday);
+        sundayEnd.setDate(saturday.getDate() + 1);
+        sundayEnd.setHours(23, 59, 59, 999);
+
+        return { start: saturday, end: sundayEnd };
+    }
 
 
 }
