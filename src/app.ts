@@ -284,6 +284,7 @@ class ExpressApp implements IApp {
           typeof req.body.name === "string" ? req.body.name : "",
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
+          typeof req.body.category === "string" ? req.body.category : null,
           typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
           typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           capacityRaw,
