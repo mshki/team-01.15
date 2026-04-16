@@ -454,6 +454,20 @@ class ExpressApp implements IApp {
         );
       }),
     );
+    this.app.get(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        const timeframe =
+          typeof req.query.timeframe === "string" ? req.query.timeframe : "all";
+
+        await this.controller.filterEventsFromQuery(res, timeframe, browserSession);
+      }),
+    );
   }
 
   getExpressApp(): express.Express {
