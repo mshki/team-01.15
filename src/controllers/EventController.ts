@@ -256,6 +256,19 @@ class EventController implements IEventController {
             });
             return;
         }
+
+        const event = result.value;
+        const currentUser = session.authenticatedUser;
+        const isAdmin = currentUser?.role === "admin";
+        const isOrganizer = currentUser?.userId === event.organizerId;
+
+        if (!isAdmin && !isOrganizer) {
+            res.status(403).render("events/partials/error", {
+                message: "User does not have access to edit this event.",
+                layout: false,
+              });
+              return;
+        }
       
         res.redirect(`/events/${result.value.id}`);
       }
