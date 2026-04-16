@@ -425,13 +425,10 @@ class ExpressApp implements IApp {
     this.app.get(
       "/events/:id",
       asyncHandler(async (req, res) => {
-        if (!this.requireAuthenticated(req, res)) {
-          return;
-        }
-
         const browserSession = touchAppSession(sessionStore(req));
+        const eventId = parseInt(req.params.id as string, 10);
 
-        await this.controller.showEventDetails(res, typeof req.params.id === "number" ? req.params.id : 0, browserSession);
+        await this.controller.showEventDetails(res, eventId, browserSession);
       }),
     );
 

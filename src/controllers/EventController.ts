@@ -254,8 +254,9 @@ class EventController implements IEventController {
         const result = await this.eventService.toggleRsvp(eventId, user.userId);
 
         if (!result.ok) {
-          res.status(this.mapErrorStatus(result.value)).render("events/partials/error", {
-            message: result.value.message,
+          const error = result.value as EventError;
+          res.status(this.mapErrorStatus(error)).render("events/partials/error", {
+            message: error.message,
             layout: false,
           });
           return;
@@ -269,8 +270,9 @@ class EventController implements IEventController {
         const result = await this.eventService.publishEvent(eventId, userId);
 
         if (!result.ok) {
+           const error = result.value as EventError;
            res.status(400).render("partials/error", {
-               message: result.value.message,
+               message: error.message,
                 layout: false,
             });
             return;
@@ -285,8 +287,9 @@ class EventController implements IEventController {
         const result = await this.eventService.cancelEvent(eventId, userId, isAdmin);
 
         if (!result.ok) {
+            const error = result.value as EventError;
             res.status(400).render("partials/error", {
-                message: result.value.message,
+                message: error.message,
                 layout: false,
             });
             return;
