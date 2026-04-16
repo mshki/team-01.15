@@ -4,7 +4,8 @@ import { ILoggingService } from "../service/LoggingService";
 import { IAppBrowserSession, IAuthenticatedUserSession } from "../session/AppSession";
 import { EventError } from "../lib/errors";
 import { IApp } from "../contracts";
-import { EventStatus } from "@prisma/client";
+import { stat } from "node:fs";
+import { EventStatus } from "../types/EventTypes";
 
 export interface IEventController {
     showEventForm(res: Response, session: IAppBrowserSession): Promise<void>;
@@ -89,7 +90,7 @@ class EventController implements IEventController {
             location: location,
             category: category,
             capacity: capacity,
-            status: EventStatus.PUBLISHED,
+            status: "PUBLISHED" as EventStatus, // Default to DRAFT if you want to require manual publishing
             organizerId: session.authenticatedUser.userId,
             startDatetime: new Date(startDatetime),
             endDatetime: new Date(endDatetime),

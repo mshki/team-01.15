@@ -1,5 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-import type { Event, EventDesc, EventAttendee } from "@prisma/client";
+
 import { DatabaseError, EventNotFoundError } from "../lib/errors";
 import { EventError } from "../lib/errors";
 import { Ok, Err, Result } from "../lib/result";
