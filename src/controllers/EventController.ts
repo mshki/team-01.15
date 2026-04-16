@@ -64,6 +64,11 @@ class EventController implements IEventController {
     }
 
     async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+        // 1. Verify eventId is valid
+        // 2. Load event details from service
+        // 3. If event not found, render error page
+        // 4. If event found, render details page with event data and session
+
         return;
     }
 
