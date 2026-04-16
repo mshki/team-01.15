@@ -196,7 +196,7 @@ class EventController implements IEventController {
             return;
         }
         
-        res.render("events/:id/edit", {
+        res.render("events/edit", {
             event: result.value,
             session,
             layout: false,
@@ -232,7 +232,7 @@ class EventController implements IEventController {
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Edit event failed: ${result.value.message}`);
 
-            res.status(status).render("events/:id/edit", {
+            res.status(status).render("events/edit", {
             error: result.value.message,
             values: {
                 title: name,
