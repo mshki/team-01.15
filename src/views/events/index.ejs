@@ -73,7 +73,7 @@
     const isMember = session.authenticatedUser?.role === 'user';
 
     const canEdit = (isAdmin || isOrganizer) && event.status !== 'CANCELLED' && event.status !== 'CONCLUDED';
-    const canRsvp = isMember && event.status === 'PUBLISHED';
+    const canRsvp = !isAdmin && !isOrganizer && event.status === 'PUBLISHED';
 
     const userRsvp = session.authenticatedUser
       ? event.attendees.find(a => a.userId === session.authenticatedUser.userId) ?? null
@@ -154,6 +154,23 @@
           </div>
           <% } %>
         <% } %>
+
+        <div class="mt-5 grid gap-4 md:grid-cols-2">
+          <% if (canRsvp) { %>
+            <%- include("./partials/rsvp-panel", {
+              event,
+              session,
+              idSuffix: event.id,
+              oob: false
+            }) %>
+          <% } %>
+      
+          <%- include("./partials/attendance-panel", {
+            event,
+            idSuffix: event.id,
+            oob: false
+          }) %>
+        </div>
 
 
         <span class="inline-block px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
