@@ -15,5 +15,5 @@
     <%- include("./rsvp-panel", { event, session }) %>
   <% } %>
 
-  <%- include("./attendance-panel", { event }) %>
+  <%- include("./attendance-panel", { event, idSuffix: event.id, oob: false }) %>
 </div>
