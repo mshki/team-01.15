@@ -12,7 +12,7 @@
 
 <div id="event-interaction-region"<%- wrapperAttr %> class="md:col-span-2 flex flex-col gap-5">
   <% if (canRsvp) { %>
-    <%- include("./rsvp-panel", { event, session }) %>
+    <%- include("./rsvp-panel", { event, session, idSuffix: event.id, oob: false }) %>
   <% } %>
 
   <%- include("./attendance-panel", { event, idSuffix: event.id, oob: false }) %>
