@@ -1,7 +1,8 @@
 <!-- views/events/show.ejs -->
 <%
-  const goingCount = event.attendees.filter(a => a.rsvpStatus === 'GOING').length;
-  const waitlistedCount = event.attendees.filter(a => a.rsvpStatus === 'WAITLISTED').length;
+  // NOTE: goingCount, waitlistedCount, userRsvp, and queuePosition are provided
+  // by EventController.showEventDetails. userRsvp is the current user's active
+  // RSVP (GOING or WAITLISTED) or null. queuePosition is 1-based or null.
 
   const isAdmin = session.authenticatedUser?.role === 'admin';
   const isOrganizer = event.organizerId === session.authenticatedUser?.userId;
@@ -9,10 +10,6 @@
 
   const canEdit = (isAdmin || isOrganizer) && event.status !== 'CANCELLED' && event.status !== 'CONCLUDED';
   const canRsvp = isMember && event.status === 'PUBLISHED';
-
-  const userRsvp = session.authenticatedUser
-    ? event.attendees.find(a => a.userId === session.authenticatedUser.userId) ?? null
-    : null;
 
   const isGoing = userRsvp?.rsvpStatus === 'GOING';
   const isWaitlisted = userRsvp?.rsvpStatus === 'WAITLISTED';
@@ -25,7 +22,9 @@
   const rsvpHelpText = userRsvp
     ? (isGoing
         ? 'You are currently marked as going.'
-        : 'You are currently on the waitlist.')
+        : (queuePosition
+            ? `You are #${queuePosition} on the waitlist.`
+            : 'You are currently on the waitlist.'))
     : (eventIsFull
         ? 'This event is full, so new RSVPs will be waitlisted.'
         : "You haven't RSVP'd yet.");
@@ -127,7 +126,21 @@
       <section id="rsvp-panel" class="p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
         <h2 class="text-lg font-semibold text-slate-900 mb-3">Your RSVP</h2>
 
-        <p class="text-slate-600 text-sm mb-4"><%= rsvpHelpText %></p>
+        <% if (isWaitlisted && queuePosition) { %>
+          <div class="mb-4 flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+            <span class="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500 text-white font-bold text-lg">
+              #<%= queuePosition %>
+            </span>
+            <div class="text-sm">
+              <p class="font-medium text-amber-900">You're #<%= queuePosition %> on the waitlist</p>
+              <p class="text-amber-700 text-xs">
+                You'll be promoted automatically when someone going cancels their RSVP.
+              </p>
+            </div>
+          </div>
+        <% } else { %>
+          <p class="text-slate-600 text-sm mb-4"><%= rsvpHelpText %></p>
+        <% } %>
 
         <form id="rsvp-form" method="post" action="/events/<%= event.id %>/rsvp/toggle">
           <button
@@ -167,7 +180,7 @@
             <dd class="text-slate-600">
               <%= goingCount %> / <%= event.capacity %> going
               <% if (waitlistedCount > 0) { %>
-                · <%= waitlistedCount %> waitlisted
+                · <%= waitlistedCount %> waitlisted<% if (isWaitlisted && queuePosition) { %> (you're #<%= queuePosition %>)<% } %>
               <% } %>
             </dd>
 
@@ -183,7 +196,7 @@
             <dd class="text-slate-600">
               <%= goingCount %> going
               <% if (waitlistedCount > 0) { %>
-                · <%= waitlistedCount %> waitlisted
+                · <%= waitlistedCount %> waitlisted<% if (isWaitlisted && queuePosition) { %> (you're #<%= queuePosition %>)<% } %>
               <% } %>
               · unlimited capacity
             </dd>

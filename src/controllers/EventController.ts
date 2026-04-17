@@ -161,12 +161,43 @@ class EventController implements IEventController {
             ? currentUser.displayName
             : event.organizerId;
 
+        // Waitlist info for the view. Counts are derived from event.attendees
+        // (the repository already returns them on the event). Queue position
+        // is computed by the service to keep the ordering rule in one place.
+        const goingCount = event.attendees.filter((r) => r.rsvpStatus === "GOING").length;
+        const waitlistedCount = event.attendees.filter((r) => r.rsvpStatus === "WAITLISTED").length;
+
+        const userRsvp = currentUser
+            ? event.attendees.find(
+                  (r) => r.userId === currentUser.userId && r.rsvpStatus !== "CANCELLED"
+              ) ?? null
+            : null;
+
+        let queuePosition: number | null = null;
+        if (currentUser && userRsvp?.rsvpStatus === "WAITLISTED") {
+            const qpResult = await this.eventService.getQueuePosition(
+                event.id,
+                currentUser.userId
+            );
+            if (qpResult.ok) {
+                queuePosition = qpResult.value;
+            } else {
+                this.logger.warn(
+                    `Failed to compute queue position for user ${currentUser.userId} on event ${event.id}`
+                );
+            }
+        }
+
         this.logger.info(`Rendering event details for event ${eventId} (status: ${event.status})`);
 
         res.render("events/show", {
             event,
             session,
             organizerName,
+            userRsvp,
+            queuePosition,
+            goingCount,
+            waitlistedCount,
             pageError: null,
         });
     }

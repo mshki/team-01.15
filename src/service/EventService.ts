@@ -26,6 +26,12 @@ export interface IEventService {
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
     filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
+    /**
+     * Returns the 1-based position of the given user in the waitlist for the event,
+     * or null if the user is not currently waitlisted. Position is ordered by
+     * createdAt (earliest join is #1).
+     */
+    getQueuePosition(eventId: number, userId: string): Promise<Result<number | null, EventError>>;
 }
 
 class EventService implements IEventService {
@@ -102,25 +108,51 @@ class EventService implements IEventService {
         return goingCount < event.capacity ? "GOING" : "WAITLISTED";
       }
       
+      /**
+       * Returns the waitlisted RSVPs for an event, ordered by join time (earliest first).
+       * This is the canonical ordering used for queue position and promotion.
+       */
+      private orderedWaitlist(event: IEvent): IRSVP[] {
+        return event.attendees
+          .filter((r) => r.rsvpStatus === "WAITLISTED")
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      }
+
+      /**
+       * Returns the 1-based position of `userId` in the event's waitlist,
+       * or null if that user is not waitlisted.
+       */
+      private calculateQueuePosition(event: IEvent, userId: string): number | null {
+        const waitlist = this.orderedWaitlist(event);
+        const idx = waitlist.findIndex((r) => r.userId === userId);
+        return idx === -1 ? null : idx + 1;
+      }
+
+      /**
+       * Promotes the earliest waitlisted RSVP to GOING if there is capacity.
+       * Mutates the passed event in-place (the caller is responsible for
+       * persisting the event in the same repository write so the cancel
+       * and promotion land atomically).
+       */
       private promoteWaitlistedIfPossible(event: IEvent): IRSVP | null {
         if (event.capacity === null) {
           return null;
         }
-      
+
         const goingCount = this.countGoing(event.attendees);
         if (goingCount >= event.capacity) {
           return null;
         }
-      
-        const waitlisted = event.attendees
-          .filter((r) => r.rsvpStatus === "WAITLISTED")
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
-      
+
+        const waitlisted = this.orderedWaitlist(event)[0];
         if (!waitlisted) {
           return null;
         }
-      
+
         waitlisted.rsvpStatus = "GOING";
+        this.logger.info(
+          `Promoted user ${waitlisted.userId} from waitlist to GOING on event ${event.id}`
+        );
         return waitlisted;
       }
 
@@ -258,21 +290,21 @@ class EventService implements IEventService {
         if (!getEvent.ok) {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         }
-        const event = getEvent.value
-      
+        const event = getEvent.value;
+
         const allowed = this.canRsvp(event);
         if (!allowed.ok) {
-            // TODO: change error
-            return Err(EventNotFoundError("TODO"));
+            return allowed as Result<IRSVP, EventError>;
         }
-      
+
         const existing = await this.eventRepository.findUserRsvp(eventId, userId);
-      
+
         let updatedRsvp: IRSVP;
-      
+
         if (!existing.ok) {
+            // First-time RSVP: join as GOING if capacity allows, else WAITLISTED.
             const status = this.nextJoinStatus(event);
-      
+
             updatedRsvp = {
                 id: `rsvp_${eventId}_${userId}_${Date.now().toString(36)}`,
                 eventId,
@@ -280,60 +312,94 @@ class EventService implements IEventService {
                 rsvpStatus: status,
                 createdAt: new Date(),
             };
-      
-            event.attendees.push(updatedRsvp);
-            return Ok(updatedRsvp);
-        } 
 
-        const currRsvp = existing.value
-        if (currRsvp.rsvpStatus === "CANCELLED") {
-            const status = this.nextJoinStatus(event);
-        
-            updatedRsvp = {
-                ...currRsvp,
-                rsvpStatus: status,
-            };
-      
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
+            event.attendees.push(updatedRsvp);
+            this.logger.info(
+                `User ${userId} joined event ${eventId} as ${status}`
             );
-      
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
+        } else {
+            const currRsvp = existing.value;
+
+            if (currRsvp.rsvpStatus === "CANCELLED") {
+                // Re-joining after a prior cancellation.
+                const status = this.nextJoinStatus(event);
+
+                updatedRsvp = {
+                    ...currRsvp,
+                    rsvpStatus: status,
+                };
+
+                const idx = event.attendees.findIndex(
+                    (r) => r.eventId === eventId && r.userId === userId
+                );
+                if (idx >= 0) {
+                    event.attendees[idx] = updatedRsvp;
+                } else {
+                    event.attendees.push(updatedRsvp);
+                }
+                this.logger.info(
+                    `User ${userId} re-joined event ${eventId} as ${status}`
+                );
             } else {
-                event.attendees.push(updatedRsvp);
-            }
-            } else {
-            const wasGoing = currRsvp.rsvpStatus === "GOING";
-        
-            updatedRsvp = {
-                ...currRsvp,
-                rsvpStatus: "CANCELLED",
-            };
-        
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
-            );
-      
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
-            } else {
-                event.attendees.push(updatedRsvp);
-            }
-        
-            if (wasGoing) {
-                this.promoteWaitlistedIfPossible(event);
+                // Cancellation path. If the cancelling user was GOING, promote
+                // the next waitlisted member in the SAME event mutation so the
+                // cancel + promotion land as a single atomic repository write.
+                const wasGoing = currRsvp.rsvpStatus === "GOING";
+
+                updatedRsvp = {
+                    ...currRsvp,
+                    rsvpStatus: "CANCELLED",
+                };
+
+                const idx = event.attendees.findIndex(
+                    (r) => r.eventId === eventId && r.userId === userId
+                );
+                if (idx >= 0) {
+                    event.attendees[idx] = updatedRsvp;
+                } else {
+                    event.attendees.push(updatedRsvp);
+                }
+
+                this.logger.info(
+                    `User ${userId} cancelled RSVP on event ${eventId} (was ${currRsvp.rsvpStatus})`
+                );
+
+                if (wasGoing) {
+                    this.promoteWaitlistedIfPossible(event);
+                }
             }
         }
-      
+
         event.updatedAt = new Date();
-      
+
+        // Single write: persists the user's status change AND any waitlist
+        // promotion together. If this fails, no partial state is saved.
         const saved = await this.eventRepository.updateEvent(event.id, event);
-        if (!saved) {
+        if (!saved.ok) {
             return Err(ValidationError("Unable to save RSVP changes."));
         }
-      
+
         return Ok(updatedRsvp);
+    }
+
+    async getQueuePosition(
+        eventId: number,
+        userId: string
+    ): Promise<Result<number | null, EventError>> {
+        if (!eventId || eventId <= 0) {
+            return Err(ValidationError("Invalid event ID."));
+        }
+        if (!userId) {
+            return Err(ValidationError("User ID is required."));
+        }
+
+        const eventResult = await this.eventRepository.getEventById(eventId);
+        if (!eventResult.ok) {
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        }
+
+        const position = this.calculateQueuePosition(eventResult.value, userId);
+        return Ok(position);
     }
     async publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>> {
         this.logger.info(`User ${userId} is publishing event ${eventId}`);
