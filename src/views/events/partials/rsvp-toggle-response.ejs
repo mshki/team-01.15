@@ -1,0 +1,14 @@
+<div id="page-error-container" hx-swap-oob="true"></div>
+
+<%- include("./rsvp-panel", {
+  event,
+  session,
+  idSuffix: event.id,
+  oob: true
+}) %>
+
+<%- include("./attendance-panel", {
+  event,
+  idSuffix: event.id,
+  oob: true
+}) %>

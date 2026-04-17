@@ -1,0 +1,62 @@
+<%
+  const attendees = Array.isArray(event?.attendees) ? event.attendees : [];
+  const goingCount = attendees.filter((a) => a.rsvpStatus === 'GOING').length;
+  const waitlistedCount = attendees.filter((a) => a.rsvpStatus === 'WAITLISTED').length;
+
+  const suffix = typeof idSuffix !== 'undefined' && idSuffix !== null ? `-${idSuffix}` : '';
+  const panelId = `attendance-panel${suffix}`;
+  const oobAttr = oob ? ' hx-swap-oob="true"' : '';
+
+  function formatDatetime(d) {
+    return new Date(d).toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+%>
+
+<section id="<%= panelId %>"<%- oobAttr %> class="p-5 border border-slate-200 rounded-2xl bg-white shadow-lg">
+  <h4 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Attendance</h4>
+
+  <dl class="flex flex-col gap-3 text-sm">
+    <div>
+      <dt class="font-medium text-slate-900 mb-0.5">Date &amp; time</dt>
+      <dd class="text-slate-600"><%= formatDatetime(event.startDatetime) %></dd>
+      <dd class="text-slate-400 text-xs mt-0.5">to <%= formatDatetime(event.endDatetime) %></dd>
+    </div>
+
+    <div>
+      <dt class="font-medium text-slate-900 mb-0.5">Attendance</dt>
+
+      <% if (event.capacity !== null) { %>
+        <dd class="text-slate-600">
+          <%= goingCount %> / <%= event.capacity %> going
+          <% if (waitlistedCount > 0) { %>
+            · <%= waitlistedCount %> waitlisted
+          <% } %>
+        </dd>
+
+        <dd class="mt-1.5">
+          <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              class="h-full rounded-full <%= goingCount >= event.capacity ? 'bg-red-500' : 'bg-blue-500' %>"
+              style="width: <%= event.capacity > 0 ? Math.min(100, Math.round((goingCount / event.capacity) * 100)) : 0 %>%"
+            ></div>
+          </div>
+        </dd>
+      <% } else { %>
+        <dd class="text-slate-600">
+          <%= goingCount %> going
+          <% if (waitlistedCount > 0) { %>
+            · <%= waitlistedCount %> waitlisted
+          <% } %>
+          · unlimited capacity
+        </dd>
+      <% } %>
+    </div>
+  </dl>
+</section>
