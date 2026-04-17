@@ -1,0 +1,53 @@
+<%
+  const currentUser = session?.authenticatedUser;
+  const attendees = Array.isArray(event?.attendees) ? event.attendees : [];
+
+  const suffix = typeof idSuffix !== 'undefined' && idSuffix !== null ? `-${idSuffix}` : '';
+  const panelId = `rsvp-panel${suffix}`;
+  const formId = `rsvp-form${suffix}`;
+  const oobAttr = oob ? ' hx-swap-oob="true"' : '';
+
+  const userRsvp = currentUser
+    ? attendees.find((a) => a.userId === currentUser.userId) ?? null
+    : null;
+
+  const goingCount = attendees.filter((a) => a.rsvpStatus === 'GOING').length;
+  const eventIsFull = event.capacity !== null && goingCount >= event.capacity;
+  const isActive = userRsvp !== null && userRsvp.rsvpStatus !== 'CANCELLED';
+
+  const buttonLabel = !userRsvp
+    ? (eventIsFull ? 'Join waitlist' : 'RSVP to this event')
+    : (isActive ? 'Cancel RSVP' : 'Reactivate RSVP');
+
+  const helpText = !userRsvp
+    ? (eventIsFull
+        ? 'This event is full, so new RSVPs will be waitlisted.'
+        : "You haven't RSVP'd yet.")
+    : (isActive
+        ? `You are currently marked as ${userRsvp.rsvpStatus.toLowerCase()}.`
+        : 'Your RSVP is cancelled.');
+%>
+
+<section id="<%= panelId %>"<%- oobAttr %> class="p-5 border border-slate-200 rounded-2xl bg-white shadow-lg">
+  <h4 class="text-base font-semibold text-slate-900 mb-2">Your RSVP</h4>
+
+  <p class="text-slate-600 text-sm mb-4"><%= helpText %></p>
+
+  <form
+    id="<%= formId %>"
+    method="post"
+    action="/events/<%= event.id %>/rsvp/toggle"
+    hx-post="/events/<%= event.id %>/rsvp/toggle"
+    hx-swap="none"
+  >
+    <button
+      type="submit"
+      class="px-4 py-2.5 rounded-lg font-medium cursor-pointer text-sm
+        <%= isActive
+          ? 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+          : 'bg-blue-600 text-white hover:bg-blue-700' %>"
+    >
+      <%= buttonLabel %>
+    </button>
+  </form>
+</section>
