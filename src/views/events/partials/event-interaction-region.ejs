@@ -1,0 +1,19 @@
+<%
+  const currentUser = session?.authenticatedUser;
+  const isAdmin = currentUser?.role === 'admin';
+  const isOrganizer = currentUser?.userId === event.organizerId;
+  const isMember = currentUser?.role === 'user'; // update if your role name differs
+
+  const goingCount = event.attendees.filter((a) => a.rsvpStatus === 'GOING').length;
+  const canRsvp =  !isAdmin && !isOrganizer && event.status === 'PUBLISHED';
+
+  const wrapperAttr = htmx ? ' hx-swap-oob="true"' : '';
+%>
+
+<div id="event-interaction-region"<%- wrapperAttr %> class="md:col-span-2 flex flex-col gap-5">
+  <% if (canRsvp) { %>
+    <%- include("./rsvp-panel", { event, session }) %>
+  <% } %>
+
+  <%- include("./attendance-panel", { event }) %>
+</div>
