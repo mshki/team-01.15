@@ -274,18 +274,27 @@ class EventController implements IEventController {
       }
 
     async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
-        const result = await this.eventService.toggleRsvp(eventId, user.userId);
+        const result = await this.eventService.toggleRsvp(eventId, user.userId, user.role);
 
         if (!result.ok) {
-          const error = result.value as EventError;
-          res.status(this.mapErrorStatus(error)).render("events/partials/error", {
-            message: error.message,
-            layout: false,
-          });
-          return;
+            const error = result.value as EventError;
+            const status = this.mapErrorStatus(error);
+            const log = status === 400 ? this.logger.warn : this.logger.error;
+            log.call(this.logger, `Toggle RSVP failed: ${error.message}`);
+            res.status(status).render("events/partials/rsvp-error-response", {
+                message: error.message,
+                layout: false,
+            });
+            return;
         }
+
+        res.render("events/partials/rsvp-toggle-response", {
+            event: result.value,
+            session,
+            layout: false,
+        });
+        return;
     
-        res.redirect(`/events/${eventId}`);
     }
     async publishFromForm(res: Response, eventId: number, userId: string): Promise<void> {
         this.logger.info(`POST publish event ${eventId} by user ${userId}`);
