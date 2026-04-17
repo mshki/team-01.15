@@ -1,11 +1,12 @@
 import { permission } from "node:process";
 import { AuthError, AuthorizationRequired } from "../auth/errors";
-import { EventError, EventNotFoundError, ValidationError } from "../lib/errors";
+import { EventError, EventNotFoundError, UnknownError, ValidationError } from "../lib/errors";
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
 import { CreateEventData, IEvent, IRSVP, RSVPStatus } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
+import { UserRole } from "../auth/User";
 
 
 
@@ -21,7 +22,7 @@ export interface IEventService {
         startDatetime: Date,
         endDatetime: Date,
         capacity: number): Promise<Result<IEvent, EventError>>;
-    toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>>;
+    toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError>>;
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
     filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
@@ -68,21 +69,35 @@ class EventService implements IEventService {
     // }
 
 
-    private canRsvp(event: IEvent): Result<void, EventError> {
-        if (event.status === "CANCELLED") {
-            return Err(ValidationError("Cancelled events cannot receive RSVPs."));
+    private canRsvp(event: IEvent, userId: string, userRole: UserRole): Result<void, EventError> {
+        if (userRole === "admin") {
+            // TODO: rsvp error logic
+            return Err(UnknownError("Only members can RSVP to events."));
         }
-    
+
+        if (event.organizerId === userId) {
+            // TODO: rsvp error logic
+            return Err(UnknownError("Organizers cannot RSVP to their own events."));
+        }
+
+        if (event.status === "CANCELLED") {
+            // TODO: rsvp error logic
+            return Err(UnknownError("Cancelled events cannot receive RSVPs."));
+        }
+
         if (event.status === "CONCLUDED") {
-            return Err(ValidationError("Concluded events cannot receive RSVPs."));
+            // TODO: rsvp error logic
+            return Err(UnknownError("Concluded events cannot receive RSVPs."));
         }
     
         if (event.status !== "PUBLISHED") {
-            return Err(ValidationError("Only published events can receive RSVPs."));
+            // TODO: rsvp error logic
+            return Err(UnknownError("Only published events can receive RSVPs."));
         }
-    
-        if (event.endDatetime.getTime() < Date.now()) {
-            return Err(ValidationError("Past events cannot receive RSVPs."));
+
+        if (new Date(event.endDatetime).getTime() <= new Date().getTime()) {
+            // TODO: rsvp error logic
+            return Err(UnknownError("Past events cannot receive RSVPs."));
         }
     
         return Ok(undefined);
@@ -252,23 +267,22 @@ class EventService implements IEventService {
         return Ok(isUpdated.value);
     }
 
-    async toggleRsvp(eventId: number, userId: string): Promise<Result<IRSVP, EventError>> {
+    async toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError>> {
         const getEvent = await this.eventRepository.getEventById(eventId);
         if (!getEvent.ok) {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         }
         const event = getEvent.value
+        const now = new Date();
       
-        const allowed = this.canRsvp(event);
+        const allowed = this.canRsvp(event, userId, userRole);
         if (!allowed.ok) {
-            // TODO: change error
-            return Err(EventNotFoundError("TODO"));
+            // TODO: rsvp error logic
+            return Err(UnknownError("TODO"));
         }
       
         const existing = await this.eventRepository.findUserRsvp(eventId, userId);
-      
         let updatedRsvp: IRSVP;
-      
         if (!existing.ok) {
             const status = this.nextJoinStatus(event);
       
@@ -281,57 +295,53 @@ class EventService implements IEventService {
             };
       
             event.attendees.push(updatedRsvp);
+        } else if (existing.value.rsvpStatus === "CANCELLED") {
+            const status = this.nextJoinStatus(event);
+            updatedRsvp = {
+                ...existing.value,
+                rsvpStatus: status,
+            };
+
+            const idx = event.attendees.findIndex(
+                (r) => r.eventId === eventId && r.userId === userId
+            );
+
+            if (idx >= 0) {
+                event.attendees[idx] = updatedRsvp;
+            } else {
+                event.attendees.push(updatedRsvp);
+            }
         } else {
-            const currRsvp = existing.value
-            if (currRsvp.rsvpStatus === "CANCELLED") {
-                const status = this.nextJoinStatus(event);
-            
-                updatedRsvp = {
-                    ...currRsvp,
-                    rsvpStatus: status,
-                };
-          
-                const idx = event.attendees.findIndex(
-                    (r) => r.eventId === eventId && r.userId === userId
-                );
-          
-                if (idx >= 0) {
-                    event.attendees[idx] = updatedRsvp;
-                } else {
-                    event.attendees.push(updatedRsvp);
-                }
-                } else {
-                const wasGoing = currRsvp.rsvpStatus === "GOING";
-            
-                updatedRsvp = {
-                    ...currRsvp,
-                    rsvpStatus: "CANCELLED",
-                };
-            
-                const idx = event.attendees.findIndex(
-                    (r) => r.eventId === eventId && r.userId === userId
-                );
-          
-                if (idx >= 0) {
-                    event.attendees[idx] = updatedRsvp;
-                } else {
-                    event.attendees.push(updatedRsvp);
-                }
-            
-                if (wasGoing) {
-                    this.promoteWaitlistedIfPossible(event);
-                }
+            const wasGoing = existing.value.rsvpStatus === "GOING";
+
+            updatedRsvp = {
+                ...existing.value,
+                rsvpStatus: "CANCELLED",
+            };
+
+            const idx = event.attendees.findIndex(
+                (r) => r.eventId === eventId && r.userId === userId
+            );
+
+            if (idx >= 0) {
+                event.attendees[idx] = updatedRsvp;
+            } else {
+                event.attendees.push(updatedRsvp);
+            }
+
+            if (wasGoing) {
+                this.promoteWaitlistedIfPossible(event);
             }
         }
-      
+
         event.updatedAt = new Date();
-      
+
         const saved = await this.eventRepository.updateEvent(event.id, event);
-        if (!saved) {
+        if (!saved.ok) {
             return Err(ValidationError("Unable to save RSVP changes."));
         }
-      
-        return Ok(updatedRsvp);
+
+        return Ok(saved.value);
     }
     async publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>> {
         this.logger.info(`User ${userId} is publishing event ${eventId}`);
