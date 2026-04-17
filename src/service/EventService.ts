@@ -27,6 +27,12 @@ export interface IEventService {
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
     filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
+    /**
+     * Returns the 1-based position of the given user in the waitlist for the event,
+     * or null if the user is not currently waitlisted. Position is ordered by
+     * createdAt (earliest join is #1).
+     */
+    getQueuePosition(eventId: number, userId: string): Promise<Result<number | null, EventError>>;
 }
 
 class EventService implements IEventService {
@@ -55,20 +61,6 @@ class EventService implements IEventService {
     
         return Ok(null);
     }
-    // async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
-    //     this.logger.info(`searchEvents called with query: "${query}"`);
-
-    //     const result = await this.eventRepository.searchEvents(query);
-
-    //     if (!result.ok) {
-    //         this.logger.warn(`searchEvents failed: ${result.error.message}`);
-    //         return result;
-    //     }
-
-    //     this.logger.info(`searchEvents returned ${result.value.length} results`);
-    //     return result;
-    // }
-
 
     private canRsvp(event: IEvent, userId: string, userRole: UserRole): Result<void, EventError> {
         if (userRole === "admin") {
@@ -117,25 +109,52 @@ class EventService implements IEventService {
         return goingCount < event.capacity ? "GOING" : "WAITLISTED";
       }
       
+      /**
+       * Returns the waitlisted RSVPs for an event, ordered by join time (earliest first).
+       * This is the canonical ordering used for both queue position and promotion,
+       * so both operations agree on who is "next" in line.
+       */
+      private orderedWaitlist(event: IEvent): IRSVP[] {
+        return event.attendees
+          .filter((r) => r.rsvpStatus === "WAITLISTED")
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      }
+
+      /**
+       * Returns the 1-based position of `userId` in the event's waitlist,
+       * or null if that user is not currently waitlisted.
+       */
+      private calculateQueuePosition(event: IEvent, userId: string): number | null {
+        const waitlist = this.orderedWaitlist(event);
+        const idx = waitlist.findIndex((r) => r.userId === userId);
+        return idx === -1 ? null : idx + 1;
+      }
+
+      /**
+       * Promotes the earliest waitlisted RSVP to GOING if there is capacity.
+       * Mutates the passed event in-place; the caller is responsible for
+       * persisting the event in the same repository write so the cancel
+       * and promotion land atomically.
+       */
       private promoteWaitlistedIfPossible(event: IEvent): IRSVP | null {
         if (event.capacity === null) {
           return null;
         }
-      
+
         const goingCount = this.countGoing(event.attendees);
         if (goingCount >= event.capacity) {
           return null;
         }
-      
-        const waitlisted = event.attendees
-          .filter((r) => r.rsvpStatus === "WAITLISTED")
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
-      
+
+        const waitlisted = this.orderedWaitlist(event)[0];
         if (!waitlisted) {
           return null;
         }
-      
+
         waitlisted.rsvpStatus = "GOING";
+        this.logger.info(
+          `Promoted user ${waitlisted.userId} from waitlist to GOING on event ${event.id}`
+        );
         return waitlisted;
       }
 
@@ -172,7 +191,7 @@ class EventService implements IEventService {
         }
 
         // 2. Call repository to create event
-        const result = await this.eventRepository.createEvent({ title, description, location, organizerId, startDatetime, endDatetime, capacity, status, attendees });
+        const result = await this.eventRepository.createEvent({ title: title, description: description, location: location, organizerId: organizerId, startDatetime: startDatetime, endDatetime: endDatetime, capacity: capacity, status: status, attendees: attendees });
         this.logger.info(`Attempted to create event with title "${title}". Result: ${result.ok ? "Success" : "Error"}`);
 
         // 3. Handle repository result and return appropriate response
@@ -344,6 +363,27 @@ class EventService implements IEventService {
 
         return Ok(saved.value);
     }
+
+    async getQueuePosition(
+        eventId: number,
+        userId: string
+    ): Promise<Result<number | null, EventError>> {
+        if (!eventId || eventId <= 0) {
+            return Err(ValidationError("Invalid event ID."));
+        }
+        if (!userId) {
+            return Err(ValidationError("User ID is required."));
+        }
+
+        const eventResult = await this.eventRepository.getEventById(eventId);
+        if (!eventResult.ok) {
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        }
+
+        const position = this.calculateQueuePosition(eventResult.value, userId);
+        return Ok(position);
+    }
+
     async publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>> {
         this.logger.info(`User ${userId} is publishing event ${eventId}`);
 

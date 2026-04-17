@@ -14,6 +14,7 @@ export interface IEventController {
         description: string,
         location: string,
         category: string | null,
+        status: EventStatus,
         startDatetime: string,
         endDatetime: string,
         capacity: number | null,
@@ -75,6 +76,7 @@ class EventController implements IEventController {
         description: string,
         location: string,
         category: string | null,
+        status: EventStatus,
         startDatetime: string,
         endDatetime: string,
         capacity: number | null,
@@ -88,6 +90,13 @@ class EventController implements IEventController {
             return;
         }
 
+        // Only staff or higher can create events
+        if (session.authenticatedUser.role == "user") {
+            this.logger.warn(`User ${session.authenticatedUser.userId} with role "user" attempted to create event.`);
+            res.status(403);
+            return;
+        }
+
         // 1. Construct createEventData
         const data = {
             title: name,
@@ -95,7 +104,7 @@ class EventController implements IEventController {
             location: location,
             category: category,
             capacity: capacity,
-            status: "PUBLISHED" as EventStatus, // Default to DRAFT if you want to require manual publishing
+            status: status,
             organizerId: session.authenticatedUser.userId,
             startDatetime: new Date(startDatetime),
             endDatetime: new Date(endDatetime),
