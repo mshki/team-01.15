@@ -55,20 +55,6 @@ class EventService implements IEventService {
     
         return Ok(null);
     }
-    // async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
-    //     this.logger.info(`searchEvents called with query: "${query}"`);
-
-    //     const result = await this.eventRepository.searchEvents(query);
-
-    //     if (!result.ok) {
-    //         this.logger.warn(`searchEvents failed: ${result.error.message}`);
-    //         return result;
-    //     }
-
-    //     this.logger.info(`searchEvents returned ${result.value.length} results`);
-    //     return result;
-    // }
-
 
     private canRsvp(event: IEvent, userId: string, userRole: UserRole): Result<void, EventError> {
         if (userRole === "admin") {
@@ -172,7 +158,7 @@ class EventService implements IEventService {
         }
 
         // 2. Call repository to create event
-        const result = await this.eventRepository.createEvent({ title, description, location, organizerId, startDatetime, endDatetime, capacity, status, attendees });
+        const result = await this.eventRepository.createEvent({ title: title, description: description, location: location, organizerId: organizerId, startDatetime: startDatetime, endDatetime: endDatetime, capacity: capacity, status: status, attendees: attendees });
         this.logger.info(`Attempted to create event with title "${title}". Result: ${result.ok ? "Success" : "Error"}`);
 
         // 3. Handle repository result and return appropriate response
