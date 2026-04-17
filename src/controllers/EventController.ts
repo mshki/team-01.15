@@ -170,12 +170,51 @@ class EventController implements IEventController {
             ? currentUser.displayName
             : event.organizerId;
 
+        // Derive RSVP/attendance data for the template:
+        //  - goingCount / waitlistedCount power the capacity meter in the sidebar.
+        //  - userRsvp is the current user's *active* RSVP (CANCELLED RSVPs are
+        //    kept in the attendees list for history, but shouldn't surface in UI).
+        //  - queuePosition is only meaningful when the user is WAITLISTED; we ask
+        //    the service for it so both "who gets promoted" and "what position am
+        //    I in" agree on ordering.
+        const goingCount = event.attendees.filter((a) => a.rsvpStatus === "GOING").length;
+        const waitlistedCount = event.attendees.filter((a) => a.rsvpStatus === "WAITLISTED").length;
+
+        const userRsvp = currentUser
+            ? event.attendees.find(
+                (a) => a.userId === currentUser.userId && a.rsvpStatus !== "CANCELLED"
+              ) ?? null
+            : null;
+
+        let queuePosition: number | null = null;
+        if (currentUser && userRsvp?.rsvpStatus === "WAITLISTED") {
+            const qpResult = await this.eventService.getQueuePosition(
+                eventId,
+                currentUser.userId
+            );
+            if (qpResult.ok) {
+                queuePosition = qpResult.value;
+            } else {
+                // Non-fatal: log and fall through with queuePosition = null so the
+                // page still renders even if the lookup fails for some reason.
+                this.logger.warn(
+                    `getQueuePosition failed for user ${currentUser.userId} on event ${eventId}: ${
+                        (qpResult.value as EventError).message
+                    }`
+                );
+            }
+        }
+
         this.logger.info(`Rendering event details for event ${eventId} (status: ${event.status})`);
 
         res.render("events/show", {
             event,
             session,
             organizerName,
+            goingCount,
+            waitlistedCount,
+            userRsvp,
+            queuePosition,
             pageError: null,
         });
     }
