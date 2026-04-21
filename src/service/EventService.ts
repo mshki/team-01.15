@@ -3,6 +3,7 @@ import { AuthError, AuthorizationRequired } from "../auth/errors";
 import {
     EventError,
     EventNotFoundError,
+    InvalidEventFilterError,
     InvalidEventTransitionError,
     InvalidFieldError,
     UnauthorizedEventActionError,
@@ -532,7 +533,7 @@ class EventService implements IEventService {
             );
         }
 
-        return Err(ValidationError("Invalid timeframe filter"));
+        return Err(InvalidEventFilterError("Invalid timeframe filter"));
     }
 
     async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
