@@ -156,10 +156,11 @@
             </dd>
 
             <dd class="mt-1.5">
+              <% const fillPct = Math.min(100, Math.round((goingCount / event.capacity) * 100)); %>
               <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
                   class="h-full rounded-full <%= goingCount >= event.capacity ? 'bg-red-500' : 'bg-blue-500' %>"
-                  style="width: <%= Math.min(100, Math.round((goingCount / event.capacity) * 100)) %>%"
+                  style="width: <%= fillPct %>%"
                 ></div>
               </div>
             </dd>
