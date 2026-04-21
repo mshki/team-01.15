@@ -337,16 +337,17 @@ class EventController implements IEventController {
                 event: { id, title: name },
                 pageError: result.value.message,
                 values: {
-                title: name,
-                description,
-                location,
-                category,
-                status,
-                startDatetime,
-                endDatetime,
-                capacity,
+                    title: name,
+                    description,
+                    location,
+                    category,
+                    status,
+                    startDatetime,
+                    endDatetime,
+                    capacity,
                 },
                 session,
+                layout: false,
             });
             return;
         }

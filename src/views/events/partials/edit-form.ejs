@@ -16,7 +16,6 @@
   const endValue = toDatetimeLocal(form.endDatetime);
   const category = form.category ?? '';
   const status = form.status ?? '';
-  const pageMessage = typeof pageError !== 'undefined' ? pageError : '';
 
   const eventStatuses = ['DRAFT', 'PUBLISHED', 'CANCELLED', 'CONCLUDED'];
   const statusLabels = {
@@ -35,23 +34,21 @@
 
 %>
 
-<div id="edit-event-shell">
+<div id="edit-event-shell" hx-ext="response-targets">
   <section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
     <h1 class="text-3xl font-bold text-slate-900 mb-3">Edit Event</h1>
     <p class="text-slate-600">Update the details for <strong><%= event.title %></strong>.</p>
   </section>
-
-  <% if (pageMessage) { %>
-    <%- include("../../partials/error", { message: pageMessage }) %>
-  <% } %>
-
+  <% if (typeof pageError !== 'undefined' && pageError) { %>
+    <%- include("../../partials/error", { message: pageError }) %>
+<% } %>
   <section class="max-w-3xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
     <form
       class="grid gap-4"
       method="post"
-      action="/events/<%= event.id %>/edit"
       hx-post="/events/<%= event.id %>/edit"
       hx-target="#edit-event-shell"
+      hx-target-400="#edit-event-shell"
       hx-swap="outerHTML"
     >
       <div>
