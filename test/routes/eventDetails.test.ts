@@ -344,6 +344,51 @@ describe("GET /events/:id — attendee counts", () => {
     });
 });
 
+// ── GET /events/:id — HTMX partial render ────────────────────────────────────
+
+describe("GET /events/:id — HTMX partial render", () => {
+    it("returns the event content without the full HTML shell for an HTMX request", async () => {
+        const { expressApp, eventService } = buildApp();
+        const event = await createEvent(eventService, { status: "PUBLISHED", title: "HTMX Test Event" });
+        const agent = request.agent(expressApp);
+
+        const res = await agent.get(`/events/${event.id}`).set("HX-Request", "true");
+        expect(res.status).toBe(200);
+        expect(res.text).toContain("HTMX Test Event");
+        expect(res.text).not.toContain("<!doctype html");
+    });
+
+    it("returns the full HTML shell for a regular (non-HTMX) request", async () => {
+        const { expressApp, eventService } = buildApp();
+        const event = await createEvent(eventService, { status: "PUBLISHED", title: "Full Page Test Event" });
+        const agent = request.agent(expressApp);
+
+        const res = await agent.get(`/events/${event.id}`);
+        expect(res.status).toBe(200);
+        expect(res.text).toContain("Full Page Test Event");
+        expect(res.text).toContain("<!doctype html");
+    });
+
+    it("returns 404 partial (no shell) for an HTMX request to a missing event", async () => {
+        const { expressApp } = buildApp();
+        const agent = request.agent(expressApp);
+
+        const res = await agent.get("/events/99999").set("HX-Request", "true");
+        expect(res.status).toBe(404);
+        expect(res.text).not.toContain("<!doctype html");
+    });
+
+    it("returns 404 partial (no shell) for an HTMX request to a draft event by a non-organizer", async () => {
+        const { expressApp, eventService } = buildApp();
+        const event = await createEvent(eventService, { status: "DRAFT", organizerId: "user-staff" });
+        const agent = request.agent(expressApp);
+
+        const res = await agent.get(`/events/${event.id}`).set("HX-Request", "true");
+        expect(res.status).toBe(404);
+        expect(res.text).not.toContain("<!doctype html");
+    });
+});
+
 // ── GET /events/:id — seeded demo event ──────────────────────────────────────
 
 describe("GET /events/:id — seeded demo event (ID 1)", () => {
