@@ -406,37 +406,23 @@ class ExpressApp implements IApp {
     );
     // ── Feature 10: Event Search ─────────────────────────────────────────────────
 
-    // GET /events/search
-    // Renders the search page. Empty query returns all published upcoming events.
-    // this.app.get(
-    //     "/events/search",
-    //     asyncHandler(async (req, res) => {
-    //         if (!this.requireAuthenticated(req, res)) return;
+    // GET /events/search?q=<query>
+    // Sprint 1: renders the search page. Empty query returns all published
+    // upcoming events; non-empty query matches against title, description,
+    // location, and category (case-insensitive substring).
+    this.app.get(
+      "/events/search",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) return;
 
-    //         const store = sessionStore(req);
-    //         const query = typeof req.query.q === "string" ? req.query.q : "";
+        const browserSession = touchAppSession(sessionStore(req));
+        const query = typeof req.query.q === "string" ? req.query.q : "";
 
-    //         const result = await this.eventService.searchEvents(query);
+        await this.controller.searchEventsFromQuery(res, query, browserSession);
+      }),
+    );
 
-    //         if (!result.ok) {
-    //             res.status(500).render("partials/error", {
-    //                 message: result.error.message,
-    //                 layout: false,
-    //             });
-    //             return;
-    //         }
 
-    //         const browserSession = recordPageView(store);
-    //         res.render("event-search", {
-    //             session: browserSession,
-    //             query,
-    //             events: result.value,
-    //             pageError: null,
-    //         });
-    //     }),
-    // );
-
- 
 
     // ── Error handler ────────────────────────────────────────────────
 
