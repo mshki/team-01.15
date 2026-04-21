@@ -356,6 +356,9 @@ class ExpressApp implements IApp {
           });
           return;
         }
+
+        const statusRaw = typeof req.body.status === "string" ? req.body.status : "DRAFT";
+        const status = statusRaw === "DRAFT" || statusRaw === "PUBLISHED" || statusRaw === "CANCELLED" || statusRaw === "CONCLUDED" ? statusRaw : "DRAFT";
     
         await this.controller.editFromForm(
           res, 
@@ -364,7 +367,8 @@ class ExpressApp implements IApp {
           typeof req.body.name === "string" ? req.body.name : "",
           typeof req.body.description === "string" ? req.body.description : "",
           typeof req.body.location === "string" ? req.body.location : "",
-          // TOOD: discuss logic for start and end date times 
+          typeof req.body.category === "string" ? req.body.category : null,
+          status,
           typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
           typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           typeof req.body.capacity === "string" ? parseInt(req.body.capacity, 10) : 0,

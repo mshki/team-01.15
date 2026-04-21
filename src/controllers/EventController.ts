@@ -30,6 +30,8 @@ export interface IEventController {
         name: string,
         description: string,
         location: string,
+        category: string,
+        status: EventStatus,
         startDatetime: Date,
         endDatetime: Date,
         capacity: number,
@@ -275,13 +277,44 @@ class EventController implements IEventController {
         name: string,
         description: string,
         location: string,
+        category: string,
+        status: EventStatus,
         startDatetime: Date,
         endDatetime: Date,
         capacity: number,
         session: IAppBrowserSession
       ): Promise<void> {
-        this.logger.info(`Editing event ${id}`);
-      
+
+        const currEvent = await this.eventService.getEventDetails(id);
+
+        if (!currEvent.ok && this.isEventError(currEvent.value)) {
+            const status = this.mapErrorStatus(currEvent.value);
+            const log = status === 400 ? this.logger.warn : this.logger.error;
+            log.call(this.logger, `Edit event failed: ${currEvent.value.message}`);
+            res.redirect('/events');
+            return;
+        } else if (!currEvent.ok) {
+            res.status(500).render("partials/error", {
+                message: "Unable to update event.",
+                layout: false,
+            });
+            return;
+        }
+
+        const currentUser = session.authenticatedUser;
+        const isAdmin = currentUser?.role === "admin";
+        const isOrganizer = currentUser?.userId === currEvent.value.organizerId;
+
+        if (!isAdmin && !isOrganizer) {
+            res.status(403).render("partials/error", {
+                message: "User does not have access to edit this event.",
+                layout: false,
+              });
+              return;
+        }
+
+        this.logger.info(`Attempting to edit event ${id}...`);
+
         const result = await this.eventService.updateEvent(
             id, 
             user.userId, 
@@ -289,6 +322,8 @@ class EventController implements IEventController {
             name,
             description,
             location,
+            category,
+            status,
             startDatetime,
             endDatetime,
             capacity,
@@ -299,18 +334,21 @@ class EventController implements IEventController {
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Edit event failed: ${result.value.message}`);
         
-            res.status(status).render("events/edit", {
+            res.status(status).render("events/partials/edit-form", {
                 event: { id, title: name },
                 pageError: result.value.message,
                 values: {
-                title: name,
-                description,
-                location,
-                startDatetime,
-                endDatetime,
-                capacity,
+                    title: name,
+                    description,
+                    location,
+                    category,
+                    status,
+                    startDatetime,
+                    endDatetime,
+                    capacity,
                 },
                 session,
+                layout: false,
             });
             return;
         }
@@ -323,20 +361,12 @@ class EventController implements IEventController {
             return;
         }
 
-        const event = result.value;
-        const currentUser = session.authenticatedUser;
-        const isAdmin = currentUser?.role === "admin";
-        const isOrganizer = currentUser?.userId === event.organizerId;
-
-        if (!isAdmin && !isOrganizer) {
-            res.status(403).render("events/partials/error", {
-                message: "User does not have access to edit this event.",
-                layout: false,
-              });
-              return;
-        }
+        this.logger.info(`Event ${id} updated successfully. Redirecting...`);
       
-        res.redirect(`/events/${result.value.id}`);
+        res.setHeader("HX-Location", `/events/${id}`);
+
+        // TODO: is this the right HTTP code?
+        res.status(200).send();
       }
 
     async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
