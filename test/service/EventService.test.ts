@@ -420,3 +420,70 @@ describe("EventService — published event filters", () => {
         expect(result.value[0]?.title).toBe("Music Night");
     });
 });
+describe("EventService — timeframe filter combinations", () => {
+    it("filters published events for this week", async () => {
+        const { service } = buildService();
+
+        const soonStart = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+        const soonEnd = new Date(soonStart.getTime() + 60 * 60 * 1000);
+
+        const laterStart = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+        const laterEnd = new Date(laterStart.getTime() + 60 * 60 * 1000);
+
+        await createEventForTest(service, {
+            title: "This Week Event",
+            status: "PUBLISHED",
+            startDatetime: soonStart,
+            endDatetime: soonEnd,
+            category: "general",
+        });
+
+        await createEventForTest(service, {
+            title: "Later Event",
+            status: "PUBLISHED",
+            startDatetime: laterStart,
+            endDatetime: laterEnd,
+            category: "general",
+        });
+
+        const result = await service.filterPublishedEvents("week");
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        const titles = result.value.map((e) => e.title);
+        expect(titles).toContain("This Week Event");
+        expect(titles).not.toContain("Later Event");
+    });
+
+    it("combines timeframe and category filters", async () => {
+        const { service } = buildService();
+
+        const soonStart = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+        const soonEnd = new Date(soonStart.getTime() + 60 * 60 * 1000);
+
+        await createEventForTest(service, {
+            title: "Music This Week",
+            status: "PUBLISHED",
+            category: "music",
+            startDatetime: soonStart,
+            endDatetime: soonEnd,
+        });
+
+        await createEventForTest(service, {
+            title: "Sports This Week",
+            status: "PUBLISHED",
+            category: "sports",
+            startDatetime: soonStart,
+            endDatetime: soonEnd,
+        });
+
+        const result = await service.filterPublishedEvents("week", "music");
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        expect(result.value).toHaveLength(1);
+        expect(result.value[0]?.title).toBe("Music This Week");
+    });
+});
