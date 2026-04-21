@@ -71,8 +71,9 @@ class EventController implements IEventController {
         if (error.name === "EventNotFoundError") return 404;
         if (error.name === "ValidationError") return 400;
         if (error.name === "InvalidFieldError") return 400;
+        if (error.name === "InvalidEventFilterError") return 400;
         return 500;
-      }
+}
     
     async showEventForm(res: Response, session: IAppBrowserSession): Promise<void> {
         res.render("events/new", { session, pageError: null });
