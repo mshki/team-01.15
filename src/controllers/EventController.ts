@@ -227,6 +227,8 @@ class EventController implements IEventController {
 
         this.logger.info(`Rendering event details for event ${eventId} (status: ${event.status})`);
 
+        const isHtmx = res.req.get("HX-Request") === "true";
+
         res.render("events/show", {
             event,
             session,
@@ -236,6 +238,7 @@ class EventController implements IEventController {
             userRsvp,
             queuePosition,
             pageError: null,
+            layout: isHtmx ? false : undefined,
         });
     }
 
