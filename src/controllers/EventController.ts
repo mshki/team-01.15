@@ -281,7 +281,7 @@ class EventController implements IEventController {
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Edit event failed: ${result.value.message}`);
         
-            res.status(status).render("events/edit", {
+            res.status(status).render("events/partials/edit-form", {
                 event: { id, title: name },
                 pageError: result.value.message,
                 values: {
@@ -311,7 +311,7 @@ class EventController implements IEventController {
         const isOrganizer = currentUser?.userId === event.organizerId;
 
         if (!isAdmin && !isOrganizer) {
-            res.status(403).render("events/partials/error", {
+            res.status(403).render("partials/error", {
                 message: "User does not have access to edit this event.",
                 layout: false,
               });

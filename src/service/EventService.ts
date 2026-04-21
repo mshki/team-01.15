@@ -278,15 +278,12 @@ class EventService implements IEventService {
             title: title.trim(),
             description: description.trim(),
             location: location.trim(),
-            startDatetime: startDatetime!,
-            endDatetime: endDatetime!,
+            startDatetime: new Date(startDatetime),
+            endDatetime: new Date(endDatetime),
             capacity: capacity,
             updatedAt: new Date(),
           };
         const isUpdated = await this.eventRepository.updateEvent(eventId, update);
-        if (!isUpdated) {
-          return Err(EventNotFoundError("Event not found."));
-        } 
 
         if (!isUpdated.ok) {
             // Verify this is the correct error type
