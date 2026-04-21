@@ -362,16 +362,26 @@ class EventController implements IEventController {
         const result = await this.eventService.publishEvent(eventId, userId);
 
         if (!result.ok) {
-           const error = result.value as EventError;
-           res.status(400).render("partials/error", {
-               message: error.message,
+            const error = result.value as EventError;
+            res.status(400).render("events/partials/lifecycle-controls", {
+                event: {
+                    id: eventId,
+                    status: "DRAFT",
+                    organizerId: userId,
+                },
+                session: { authenticatedUser: { userId } },
+                pageError: error.message,
                 layout: false,
             });
             return;
         }
 
-        res.redirect(`/events/${eventId}`);
-
+        res.render("events/partials/lifecycle-controls", {
+            event: result.value,
+            session: { authenticatedUser: { userId } },
+            pageError: null,
+            layout: false,
+        });
     }
     async cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void> {
         this.logger.info(`POST cancel event ${eventId} by user ${userId}`);
@@ -380,14 +390,25 @@ class EventController implements IEventController {
 
         if (!result.ok) {
             const error = result.value as EventError;
-            res.status(400).render("partials/error", {
-                message: error.message,
+            res.status(400).render("events/partials/lifecycle-controls", {
+                event: {
+                    id: eventId,
+                    status: "PUBLISHED",
+                    organizerId: userId,
+                },
+                session: { authenticatedUser: { userId, role: isAdmin ? "admin" : "staff" } },
+                pageError: error.message,
                 layout: false,
             });
             return;
         }
 
-        res.redirect(`/events/${eventId}`);
+        res.render("events/partials/lifecycle-controls", {
+            event: result.value,
+            session: { authenticatedUser: { userId, role: isAdmin ? "admin" : "staff" } },
+            pageError: null,
+            layout: false,
+        });
     }
 
     async filterEventsFromQuery(
