@@ -27,17 +27,11 @@ export const UnknownError = (message: string): EventError => ({
 });
 
 export const InvalidEventTransitionError = (message: string): EventError => ({
-
     name: "InvalidEventTransitionError",
-
     message,
-
 });
 
 export const UnauthorizedEventActionError = (message: string): EventError => ({
-
     name: "UnauthorizedEventActionError",
-
     message,
-
 });
