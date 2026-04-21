@@ -452,12 +452,12 @@ class EventService implements IEventService {
 
         if (!isOrganizer && !isAdmin) {
             this.logger.info(`Cancel denied for user ${userId} on event ${eventId}: not organizer or admin`);
-            return Err(ValidationError("Only the organizer or an admin can cancel this event"));
+            return Err(UnauthorizedEventActionError("Only the organizer or an admin can cancel this event"));
         }
 
         if (event.status !== "PUBLISHED") {
             this.logger.info(`Cancel denied for event ${eventId}: status is ${event.status}`);
-            return Err(ValidationError("Only published events can be cancelled"));
+            return Err(InvalidEventTransitionError("Only published events can be cancelled"));
         }
 
         const updatedResult = await this.eventRepository.updateEvent(eventId, {
