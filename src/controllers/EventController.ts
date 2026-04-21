@@ -473,7 +473,18 @@ class EventController implements IEventController {
             });
             return;
         }
-    
+
+        const isHtmx = res.req.get("HX-Request") === "true";
+
+        if (isHtmx) {
+            res.render("events/partials/event-list", {
+                events: result.value,
+                session,
+                layout: false,
+            });
+            return;
+        }
+
         res.render("events/index", {
             events: result.value,
             timeframe: normalizedTimeframe,
