@@ -487,3 +487,16 @@ describe("EventService — timeframe filter combinations", () => {
         expect(result.value[0]?.title).toBe("Music This Week");
     });
 });
+describe("EventService — invalid filter input", () => {
+    it("rejects invalid timeframe values", async () => {
+        const { service } = buildService();
+
+        const result = await service.filterPublishedEvents("not-a-real-filter");
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("InvalidEventFilterError");
+            expect(result.value.message).toBe("Invalid timeframe filter");
+        }
+    });
+});
