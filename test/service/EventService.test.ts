@@ -253,3 +253,50 @@ describe("EventService — queue position calculation", () => {
         if (!missingEvent.ok) expect(missingEvent.value.name).toBe("EventNotFoundError");
     });
 });
+describe("EventService — cancel transitions", () => {
+    it("allows organizer to cancel a published event", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "PUBLISHED",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.cancelEvent(event.id, "user-staff", false);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.value.status).toBe("CANCELLED");
+        }
+    });
+
+    it("allows admin to cancel another user's published event", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "PUBLISHED",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.cancelEvent(event.id, "user-admin", true);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.value.status).toBe("CANCELLED");
+        }
+    });
+
+    it("rejects cancel when user is not organizer or admin", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "PUBLISHED",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.cancelEvent(event.id, "user-reader", false);
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("UnauthorizedEventActionError");
+            expect(result.value.message).toBe("Only the organizer or an admin can cancel this event");
+        }
+    });
+});
