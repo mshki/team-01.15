@@ -102,7 +102,7 @@ class EventController implements IEventController {
         // Only staff or higher can create events
         if (session.authenticatedUser.role == "user") {
             this.logger.warn(`User ${session.authenticatedUser.userId} with role "user" attempted to create event.`);
-            res.status(403);
+            res.status(403).end();
             return;
         }
 
