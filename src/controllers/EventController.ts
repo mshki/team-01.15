@@ -364,7 +364,9 @@ class EventController implements IEventController {
         this.logger.info(`Event ${id} updated successfully. Redirecting...`);
       
         res.setHeader("HX-Location", `/events/${id}`);
-        res.status(204).send();
+
+        // TODO: is this the right HTTP code?
+        res.status(200).send();
       }
 
     async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
