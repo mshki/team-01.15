@@ -73,8 +73,9 @@ class EventController implements IEventController {
         if (error.name === "EventNotFoundError") return 404;
         if (error.name === "ValidationError") return 400;
         if (error.name === "InvalidFieldError") return 400;
+        if (error.name === "InvalidEventFilterError") return 400;
         return 500;
-      }
+}
     
     async showEventForm(res: Response, session: IAppBrowserSession): Promise<void> {
         res.render("events/new", { session, pageError: null });
@@ -103,7 +104,7 @@ class EventController implements IEventController {
         // Only staff or higher can create events
         if (session.authenticatedUser.role == "user") {
             this.logger.warn(`User ${session.authenticatedUser.userId} with role "user" attempted to create event.`);
-            res.status(403);
+            res.status(403).end();
             return;
         }
 
@@ -500,7 +501,18 @@ class EventController implements IEventController {
             });
             return;
         }
-    
+
+        const isHtmx = res.req.get("HX-Request") === "true";
+
+        if (isHtmx) {
+            res.render("events/partials/event-list", {
+                events: result.value,
+                session,
+                layout: false,
+            });
+            return;
+        }
+
         res.render("events/index", {
             events: result.value,
             timeframe: normalizedTimeframe,
