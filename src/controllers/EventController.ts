@@ -18,7 +18,8 @@ export interface IEventController {
         startDatetime: string,
         endDatetime: string,
         capacity: number | null,
-        session: IAppBrowserSession
+        session: IAppBrowserSession,
+        isHtmx?: boolean
     ): Promise<void>;
     showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
     getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void>;
@@ -41,12 +42,17 @@ export interface IEventController {
         user: IAuthenticatedUserSession,
         session: IAppBrowserSession
         ): Promise<void>;
-    publishFromForm(res: Response, eventId: number, userId: string): Promise<void>;
-    cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void>;
+    publishFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
+    cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
     filterEventsFromQuery(
         res: Response,
         timeframe: string,
         category: string | null,
+        session: IAppBrowserSession
+    ): Promise<void>;
+    searchEventsFromQuery(
+        res: Response,
+        query: string,
         session: IAppBrowserSession
     ): Promise<void>;
 }
@@ -66,6 +72,7 @@ class EventController implements IEventController {
     private mapErrorStatus(error: EventError): number {
         if (error.name === "EventNotFoundError") return 404;
         if (error.name === "ValidationError") return 400;
+        if (error.name === "InvalidFieldError") return 400;
         return 500;
       }
     
@@ -82,7 +89,8 @@ class EventController implements IEventController {
         startDatetime: string,
         endDatetime: string,
         capacity: number | null,
-        session: IAppBrowserSession
+        session: IAppBrowserSession,
+        isHtmx: boolean = false
     ): Promise<void> {
         this.logger.info(`Creating new event with name "${name}"`);
 
@@ -119,17 +127,26 @@ class EventController implements IEventController {
         this.logger.info(`Attempted to create event with name "${name}". Result: ${result.ok ? "Success" : "Error"}`);
 
         if (!result.ok && this.isEventError(result.value)) {
-            const status = this.mapErrorStatus(result.value);
-            const log = status === 400 ? this.logger.warn : this.logger.error;
+            const httpStatus = this.mapErrorStatus(result.value);
+            const log = httpStatus === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Create event failed: ${result.value.message}`);
 
-            res.status(status);
-
-            return
+            res.status(isHtmx ? 200 : httpStatus).render("events/new", {
+                session,
+                pageError: result.value.message,
+                formValues: { name, description, location, category, status, startDatetime, endDatetime, capacity },
+                layout: isHtmx ? false : "layouts/base",
+            });
+            return;
         }
 
         // 3. Handle service result and return appropriate response
-        res.redirect("/home");
+        if (isHtmx) {
+            res.setHeader("HX-Redirect", "/home");
+            res.status(200).send();
+        } else {
+            res.redirect("/home");
+        }
     }
 
         async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
@@ -371,38 +388,79 @@ class EventController implements IEventController {
         return;
     
     }
-    async publishFromForm(res: Response, eventId: number, userId: string): Promise<void> {
-        this.logger.info(`POST publish event ${eventId} by user ${userId}`);
-
-        const result = await this.eventService.publishEvent(eventId, userId);
-
-        if (!result.ok) {
-           const error = result.value as EventError;
-           res.status(400).render("partials/error", {
-               message: error.message,
+    async publishFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+        const userId = session.authenticatedUser?.userId;
+        if (!userId) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
                 layout: false,
             });
             return;
         }
 
-        res.redirect(`/events/${eventId}`);
+        this.logger.info(`POST publish event ${eventId} by user ${userId}`);
 
+        const result = await this.eventService.publishEvent(eventId, userId);
+
+        if (!result.ok) {
+            const error = result.value as EventError;
+            res.status(400).render("events/partials/lifecycle-controls", {
+                event: {
+                    id: eventId,
+                    status: "DRAFT",
+                    organizerId: userId,
+                },
+                session,
+                pageError: error.message,
+                layout: false,
+            });
+            return;
+        }
+
+        res.render("events/partials/lifecycle-controls", {
+            event: result.value,
+            session,
+            pageError: null,
+            layout: false,
+        });
     }
-    async cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void> {
+        async cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+        const userId = session.authenticatedUser?.userId;
+        const isAdmin = session.authenticatedUser?.role === "admin";
+
+        if (!userId) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
+                layout: false,
+            });
+            return;
+        }
+
         this.logger.info(`POST cancel event ${eventId} by user ${userId}`);
 
         const result = await this.eventService.cancelEvent(eventId, userId, isAdmin);
 
         if (!result.ok) {
             const error = result.value as EventError;
-            res.status(400).render("partials/error", {
-                message: error.message,
+            res.status(400).render("events/partials/lifecycle-controls", {
+                event: {
+                    id: eventId,
+                    status: "PUBLISHED",
+                    organizerId: userId,
+                },
+                session,
+                pageError: error.message,
                 layout: false,
             });
             return;
         }
 
-        res.redirect(`/events/show/${eventId}`);
+        res.render("events/partials/lifecycle-controls", {
+            event: result.value,
+            session,
+            pageError: null,
+            layout: false,
+        });
     }
 
     async filterEventsFromQuery(
@@ -446,6 +504,45 @@ class EventController implements IEventController {
             events: result.value,
             timeframe: normalizedTimeframe,
             category,
+            session,
+            pageError: null,
+        });
+    }
+
+    async searchEventsFromQuery(
+        res: Response,
+        query: string,
+        session: IAppBrowserSession
+    ): Promise<void> {
+        this.logger.info(`Searching events with query "${query}"`);
+
+        const result = await this.eventService.searchEvents(query);
+
+        // Same error-handling shape as filterEventsFromQuery: differentiate
+        // known EventErrors from anything unexpected, and never swallow them.
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            res.status(status).render("events/partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("events/partials/error", {
+                message: "Unable to search events.",
+                layout: false,
+            });
+            return;
+        }
+
+        // Pass the ORIGINAL query string (not a normalized version) back to the
+        // view so the input field can re-populate with exactly what the user
+        // typed. The service handled normalization internally.
+        res.render("events/search", {
+            events: result.value,
+            query,
             session,
             pageError: null,
         });

@@ -3,7 +3,6 @@ import { Err, Ok, type Result } from "../lib/result";
 import type { EventError } from "../lib/errors";
 import type { IEventRepository } from "./EventRepository";
 import { CreateEventData, Event, IRSVP, type IEvent } from "../types/EventTypes";
-import { ValidationError } from "../auth/errors";
 
 class InMemoryEventRepository implements IEventRepository {
     private events = new Map<number, IEvent>(
