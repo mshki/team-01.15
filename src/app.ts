@@ -291,7 +291,8 @@ class ExpressApp implements IApp {
           typeof req.body.startDatetime === "string" ? req.body.startDatetime : "",
           typeof req.body.endDatetime === "string" ? req.body.endDatetime : "",
           capacityRaw,
-          browserSession
+          browserSession,
+          req.headers["hx-request"] === "true"
         );
       }),
     );
