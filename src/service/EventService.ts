@@ -172,7 +172,7 @@ class EventService implements IEventService {
         const title = String(eventData.title ?? "").trim();
         const description = String(eventData.description ?? "").trim();
         const location = String(eventData.location ?? "").trim();
-        const { organizerId, startDatetime, endDatetime, capacity, status, attendees } = eventData;
+        const { organizerId, startDatetime, endDatetime, capacity, status, attendees, category } = eventData;
 
         if (!title) {
             return Err(ValidationError("Title is required."));
@@ -200,7 +200,8 @@ class EventService implements IEventService {
         }
 
         // 2. Call repository to create event
-        const result = await this.eventRepository.createEvent({ title: title, description: description, location: location, organizerId: organizerId, startDatetime: startDatetime, endDatetime: endDatetime, capacity: capacity, status: status, attendees: attendees });
+        const result = await this.eventRepository.createEvent({ title: title, description: description, location: location, category: category, organizerId: organizerId, startDatetime: startDatetime, endDatetime: endDatetime, capacity: capacity, status: status, attendees: attendees,
+});
         this.logger.info(`Attempted to create event with title "${title}". Result: ${result.ok ? "Success" : "Error"}`);
 
         // 3. Handle repository result and return appropriate response
@@ -487,8 +488,10 @@ class EventService implements IEventService {
         );
 
         if (category && category.trim() !== "") {
+            const normalizedCategory = category.trim().toLowerCase();
+
             filteredEvents = filteredEvents.filter(
-                (event) => (event.category ?? "").toLowerCase() === category.toLowerCase()
+                (event) => (event.category ?? "").trim().toLowerCase() === normalizedCategory
             );
         }
 
