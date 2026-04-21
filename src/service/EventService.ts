@@ -4,6 +4,7 @@ import {
     EventError,
     EventNotFoundError,
     InvalidEventTransitionError,
+    InvalidFieldError,
     UnauthorizedEventActionError,
     UnknownError,
     ValidationError
@@ -173,28 +174,28 @@ class EventService implements IEventService {
         const { organizerId, startDatetime, endDatetime, capacity, status, attendees, category } = eventData;
 
         if (!title) {
-            return Err(ValidationError("Title is required."));
+            return Err(InvalidFieldError("Title is required."));
         }
         if (title.length < 3) {
-            return Err(ValidationError("Title must be at least 3 characters."));
+            return Err(InvalidFieldError("Title must be at least 3 characters."));
         }
         if (!description) {
-            return Err(ValidationError("Description is required."));
+            return Err(InvalidFieldError("Description is required."));
         }
         if (!location) {
-            return Err(ValidationError("Location is required."));
+            return Err(InvalidFieldError("Location is required."));
         }
         if (!organizerId) {
-            return Err(ValidationError("Organizer is required."));
+            return Err(InvalidFieldError("Organizer is required."));
         }
         if (!startDatetime || !endDatetime) {
-            return Err(ValidationError("Start and end datetime are required."));
+            return Err(InvalidFieldError("Start and end datetime are required."));
         }
         if (endDatetime <= startDatetime) {
-            return Err(ValidationError("End datetime must be after start datetime."));
+            return Err(InvalidFieldError("End datetime must be after start datetime."));
         }
         if (capacity != null && capacity < 1) {
-            return Err(ValidationError("Capacity must be at least 1."));
+            return Err(InvalidFieldError("Capacity must be at least 1."));
         }
 
         // 2. Call repository to create event
