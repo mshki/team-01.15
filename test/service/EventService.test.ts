@@ -253,6 +253,55 @@ describe("EventService — queue position calculation", () => {
         if (!missingEvent.ok) expect(missingEvent.value.name).toBe("EventNotFoundError");
     });
 });
+describe("EventService — publish transitions", () => {
+    it("allows organizer to publish a draft event", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "DRAFT",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.publishEvent(event.id, "user-staff");
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.value.status).toBe("PUBLISHED");
+        }
+    });
+
+    it("rejects publish when user is not the organizer", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "DRAFT",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.publishEvent(event.id, "user-admin");
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("UnauthorizedEventActionError");
+            expect(result.value.message).toBe("Only the organizer can publish this event");
+        }
+    });
+
+    it("rejects publish when event is not in draft state", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "PUBLISHED",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.publishEvent(event.id, "user-staff");
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("InvalidEventTransitionError");
+            expect(result.value.message).toBe("Only draft events can be published");
+        }
+    });
+});
+
 describe("EventService — cancel transitions", () => {
     it("allows organizer to cancel a published event", async () => {
         const { service } = buildService();
