@@ -11,7 +11,7 @@ import {
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
-import { CreateEventData, IEvent, IRSVP, RSVPStatus } from "../types/EventTypes";
+import { CreateEventData, EventStatus, IEvent, IRSVP, RSVPStatus } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 import { UserRole } from "../auth/User";
 
@@ -27,6 +27,8 @@ export interface IEventService {
         title: string,
         description: string,
         location: string,
+        category: string,
+        status: EventStatus,
         startDatetime: Date,
         endDatetime: Date,
         capacity: number): Promise<Result<IEvent, EventError>>;
@@ -243,7 +245,7 @@ class EventService implements IEventService {
         }
     }
 
-    async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
+    async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, category: string, status: EventStatus, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
         const eventResult = await this.getEventEditForm(eventId, userId, userRole);
         if (!eventResult.ok) {
             // TODO: verify error
@@ -278,6 +280,8 @@ class EventService implements IEventService {
             title: title.trim(),
             description: description.trim(),
             location: location.trim(),
+            category: category.trim(),
+            status: status,
             startDatetime: new Date(startDatetime),
             endDatetime: new Date(endDatetime),
             capacity: capacity,
