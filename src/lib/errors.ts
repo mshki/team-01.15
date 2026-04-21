@@ -1,10 +1,13 @@
-export type EventError = 
+export type EventError =
     | { name: "EventNotFoundError"; message: string }
     | { name: "DatabaseError"; message: string }
     | { name: "ValidationError"; message: string }
     | { name: "UnknownError"; message: string }
     | { name: "InvalidEventTransitionError"; message: string }
-    | { name: "UnauthorizedEventActionError"; message: string };
+    | { name: "UnauthorizedEventActionError"; message: string }
+    | { name: "UnauthorizedError"; message: string }
+    | { name: "ForbiddenError"; message: string }
+    | { name: "InvalidFieldError"; message: string };
 
 export const EventNotFoundError = (message: string): EventError => ({
     name: "EventNotFoundError",
@@ -33,5 +36,20 @@ export const InvalidEventTransitionError = (message: string): EventError => ({
 
 export const UnauthorizedEventActionError = (message: string): EventError => ({
     name: "UnauthorizedEventActionError",
+    message,
+});
+
+export const UnauthorizedError = (message: string): EventError => ({
+    name: "UnauthorizedError",
+    message,
+});
+
+export const ForbiddenError = (message: string): EventError => ({
+    name: "ForbiddenError",
+    message,
+});
+
+export const InvalidFieldError = (message: string): EventError => ({
+    name: "InvalidFieldError",
     message,
 });

@@ -18,7 +18,8 @@ export interface IEventController {
         startDatetime: string,
         endDatetime: string,
         capacity: number | null,
-        session: IAppBrowserSession
+        session: IAppBrowserSession,
+        isHtmx?: boolean
     ): Promise<void>;
     showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
     getEditForm(res: Response, id: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void>;
@@ -64,6 +65,7 @@ class EventController implements IEventController {
     private mapErrorStatus(error: EventError): number {
         if (error.name === "EventNotFoundError") return 404;
         if (error.name === "ValidationError") return 400;
+        if (error.name === "InvalidFieldError") return 400;
         return 500;
       }
     
@@ -80,7 +82,8 @@ class EventController implements IEventController {
         startDatetime: string,
         endDatetime: string,
         capacity: number | null,
-        session: IAppBrowserSession
+        session: IAppBrowserSession,
+        isHtmx: boolean = false
     ): Promise<void> {
         this.logger.info(`Creating new event with name "${name}"`);
 
@@ -117,17 +120,26 @@ class EventController implements IEventController {
         this.logger.info(`Attempted to create event with name "${name}". Result: ${result.ok ? "Success" : "Error"}`);
 
         if (!result.ok && this.isEventError(result.value)) {
-            const status = this.mapErrorStatus(result.value);
-            const log = status === 400 ? this.logger.warn : this.logger.error;
+            const httpStatus = this.mapErrorStatus(result.value);
+            const log = httpStatus === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Create event failed: ${result.value.message}`);
 
-            res.status(status);
-
-            return
+            res.status(isHtmx ? 200 : httpStatus).render("events/new", {
+                session,
+                pageError: result.value.message,
+                formValues: { name, description, location, category, status, startDatetime, endDatetime, capacity },
+                layout: isHtmx ? false : "layouts/base",
+            });
+            return;
         }
 
         // 3. Handle service result and return appropriate response
-        res.redirect("/home");
+        if (isHtmx) {
+            res.setHeader("HX-Redirect", "/home");
+            res.status(200).send();
+        } else {
+            res.redirect("/home");
+        }
     }
 
         async showEventDetails(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
