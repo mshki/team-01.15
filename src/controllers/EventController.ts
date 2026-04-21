@@ -40,8 +40,8 @@ export interface IEventController {
         user: IAuthenticatedUserSession,
         session: IAppBrowserSession
         ): Promise<void>;
-    publishFromForm(res: Response, eventId: number, userId: string): Promise<void>;
-    cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void>;
+    publishFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
+    cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
     filterEventsFromQuery(
         res: Response,
         timeframe: string,
@@ -356,7 +356,16 @@ class EventController implements IEventController {
         return;
     
     }
-    async publishFromForm(res: Response, eventId: number, userId: string): Promise<void> {
+    async publishFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+        const userId = session.authenticatedUser?.userId;
+        if (!userId) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
+                layout: false,
+            });
+            return;
+        }
+
         this.logger.info(`POST publish event ${eventId} by user ${userId}`);
 
         const result = await this.eventService.publishEvent(eventId, userId);
@@ -369,7 +378,7 @@ class EventController implements IEventController {
                     status: "DRAFT",
                     organizerId: userId,
                 },
-                session: { authenticatedUser: { userId } },
+                session,
                 pageError: error.message,
                 layout: false,
             });
@@ -378,12 +387,23 @@ class EventController implements IEventController {
 
         res.render("events/partials/lifecycle-controls", {
             event: result.value,
-            session: { authenticatedUser: { userId } },
+            session,
             pageError: null,
             layout: false,
         });
     }
-    async cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void> {
+        async cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+        const userId = session.authenticatedUser?.userId;
+        const isAdmin = session.authenticatedUser?.role === "admin";
+
+        if (!userId) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
+                layout: false,
+            });
+            return;
+        }
+
         this.logger.info(`POST cancel event ${eventId} by user ${userId}`);
 
         const result = await this.eventService.cancelEvent(eventId, userId, isAdmin);
@@ -396,7 +416,7 @@ class EventController implements IEventController {
                     status: "PUBLISHED",
                     organizerId: userId,
                 },
-                session: { authenticatedUser: { userId, role: isAdmin ? "admin" : "staff" } },
+                session,
                 pageError: error.message,
                 layout: false,
             });
@@ -405,7 +425,7 @@ class EventController implements IEventController {
 
         res.render("events/partials/lifecycle-controls", {
             event: result.value,
-            session: { authenticatedUser: { userId, role: isAdmin ? "admin" : "staff" } },
+            session,
             pageError: null,
             layout: false,
         });
