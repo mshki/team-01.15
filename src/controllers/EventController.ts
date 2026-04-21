@@ -266,8 +266,37 @@ class EventController implements IEventController {
         capacity: number,
         session: IAppBrowserSession
       ): Promise<void> {
-        this.logger.info(`Editing event ${id}`);
-      
+
+        const currEvent = await this.eventService.getEventDetails(id);
+
+        if (!currEvent.ok && this.isEventError(currEvent.value)) {
+            const status = this.mapErrorStatus(currEvent.value);
+            const log = status === 400 ? this.logger.warn : this.logger.error;
+            log.call(this.logger, `Edit event failed: ${currEvent.value.message}`);
+            res.redirect('/events');
+            return;
+        } else if (!currEvent.ok) {
+            res.status(500).render("partials/error", {
+                message: "Unable to update event.",
+                layout: false,
+            });
+            return;
+        }
+
+        const currentUser = session.authenticatedUser;
+        const isAdmin = currentUser?.role === "admin";
+        const isOrganizer = currentUser?.userId === currEvent.value.organizerId;
+
+        if (!isAdmin && !isOrganizer) {
+            res.status(403).render("partials/error", {
+                message: "User does not have access to edit this event.",
+                layout: false,
+              });
+              return;
+        }
+
+        this.logger.info(`Attempting to edit event ${id}...`);
+
         const result = await this.eventService.updateEvent(
             id, 
             user.userId, 
@@ -313,20 +342,10 @@ class EventController implements IEventController {
             return;
         }
 
-        const event = result.value;
-        const currentUser = session.authenticatedUser;
-        const isAdmin = currentUser?.role === "admin";
-        const isOrganizer = currentUser?.userId === event.organizerId;
-
-        if (!isAdmin && !isOrganizer) {
-            res.status(403).render("partials/error", {
-                message: "User does not have access to edit this event.",
-                layout: false,
-              });
-              return;
-        }
+        this.logger.info(`Event ${id} updated successfully. Redirecting...`);
       
-        res.redirect(`/events/${result.value.id}`);
+        res.setHeader("HX-Location", `/events/${id}`);
+        res.status(204).send();
       }
 
     async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
@@ -383,7 +402,7 @@ class EventController implements IEventController {
             return;
         }
 
-        res.redirect(`/events/${eventId}`);
+        res.redirect(`/events/show/${eventId}`);
     }
 
     async filterEventsFromQuery(
