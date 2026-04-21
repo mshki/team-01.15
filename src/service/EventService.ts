@@ -1,6 +1,13 @@
 import { permission } from "node:process";
 import { AuthError, AuthorizationRequired } from "../auth/errors";
-import { EventError, EventNotFoundError, UnknownError, ValidationError } from "../lib/errors";
+import {
+    EventError,
+    EventNotFoundError,
+    InvalidEventTransitionError,
+    UnauthorizedEventActionError,
+    UnknownError,
+    ValidationError
+} from "../lib/errors";
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
@@ -398,12 +405,12 @@ class EventService implements IEventService {
 
         if (event.organizerId !== userId) {
             this.logger.info(`Publish denied for user ${userId} on event ${eventId}: not organizer`);
-            return Err(ValidationError("Only the organizer can publish this event"));
-        }
+            return Err(UnauthorizedEventActionError("Only the organizer can publish this event"));
+        } 
 
         if (event.status !== "DRAFT") {
             this.logger.info(`Publish denied for event ${eventId}: status is ${event.status}`);
-            return Err(ValidationError("Only draft events can be published"));
+            return Err(InvalidEventTransitionError("Only draft events can be published"));
         }
 
         const updatedResult = await this.eventRepository.updateEvent(eventId, {
@@ -436,12 +443,12 @@ class EventService implements IEventService {
 
         if (!isOrganizer && !isAdmin) {
             this.logger.info(`Cancel denied for user ${userId} on event ${eventId}: not organizer or admin`);
-            return Err(ValidationError("Only the organizer or an admin can cancel this event"));
+            return Err(UnauthorizedEventActionError("Only the organizer or an admin can cancel this event"));
         }
 
         if (event.status !== "PUBLISHED") {
             this.logger.info(`Cancel denied for event ${eventId}: status is ${event.status}`);
-            return Err(ValidationError("Only published events can be cancelled"));
+            return Err(InvalidEventTransitionError("Only published events can be cancelled"));
         }
 
         const updatedResult = await this.eventRepository.updateEvent(eventId, {
