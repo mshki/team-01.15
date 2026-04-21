@@ -349,3 +349,20 @@ describe("EventService — cancel transitions", () => {
         }
     });
 });
+describe("EventService — invalid lifecycle transitions", () => {
+    it("rejects cancel when event is not published", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "DRAFT",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.cancelEvent(event.id, "user-staff", false);
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("InvalidEventTransitionError");
+            expect(result.value.message).toBe("Only published events can be cancelled");
+        }
+    });
+});
