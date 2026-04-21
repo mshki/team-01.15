@@ -40,8 +40,8 @@ export interface IEventController {
         user: IAuthenticatedUserSession,
         session: IAppBrowserSession
         ): Promise<void>;
-    publishFromForm(res: Response, eventId: number, userId: string): Promise<void>;
-    cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void>;
+    publishFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
+    cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
     filterEventsFromQuery(
         res: Response,
         timeframe: string,
@@ -361,38 +361,79 @@ class EventController implements IEventController {
         return;
     
     }
-    async publishFromForm(res: Response, eventId: number, userId: string): Promise<void> {
-        this.logger.info(`POST publish event ${eventId} by user ${userId}`);
-
-        const result = await this.eventService.publishEvent(eventId, userId);
-
-        if (!result.ok) {
-           const error = result.value as EventError;
-           res.status(400).render("partials/error", {
-               message: error.message,
+    async publishFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+        const userId = session.authenticatedUser?.userId;
+        if (!userId) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
                 layout: false,
             });
             return;
         }
 
-        res.redirect(`/events/${eventId}`);
+        this.logger.info(`POST publish event ${eventId} by user ${userId}`);
 
+        const result = await this.eventService.publishEvent(eventId, userId);
+
+        if (!result.ok) {
+            const error = result.value as EventError;
+            res.status(400).render("events/partials/lifecycle-controls", {
+                event: {
+                    id: eventId,
+                    status: "DRAFT",
+                    organizerId: userId,
+                },
+                session,
+                pageError: error.message,
+                layout: false,
+            });
+            return;
+        }
+
+        res.render("events/partials/lifecycle-controls", {
+            event: result.value,
+            session,
+            pageError: null,
+            layout: false,
+        });
     }
-    async cancelFromForm(res: Response, eventId: number, userId: string, isAdmin: boolean): Promise<void> {
+        async cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+        const userId = session.authenticatedUser?.userId;
+        const isAdmin = session.authenticatedUser?.role === "admin";
+
+        if (!userId) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
+                layout: false,
+            });
+            return;
+        }
+
         this.logger.info(`POST cancel event ${eventId} by user ${userId}`);
 
         const result = await this.eventService.cancelEvent(eventId, userId, isAdmin);
 
         if (!result.ok) {
             const error = result.value as EventError;
-            res.status(400).render("partials/error", {
-                message: error.message,
+            res.status(400).render("events/partials/lifecycle-controls", {
+                event: {
+                    id: eventId,
+                    status: "PUBLISHED",
+                    organizerId: userId,
+                },
+                session,
+                pageError: error.message,
                 layout: false,
             });
             return;
         }
 
-        res.redirect(`/events/${eventId}`);
+        res.render("events/partials/lifecycle-controls", {
+            event: result.value,
+            session,
+            pageError: null,
+            layout: false,
+        });
     }
 
     async filterEventsFromQuery(

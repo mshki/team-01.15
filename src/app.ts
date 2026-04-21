@@ -470,7 +470,8 @@ class ExpressApp implements IApp {
           return;
         }
 
-        await this.controller.publishFromForm(res, eventId, currentUser.userId);
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.publishFromForm(res, eventId, browserSession);
       }),
     );
 
@@ -499,12 +500,8 @@ class ExpressApp implements IApp {
           return;
         }
 
-        await this.controller.cancelFromForm(
-          res,
-          eventId,
-          currentUser.userId,
-          currentUser.role === "admin",
-        );
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.cancelFromForm(res, eventId, browserSession);
       }),
     );
 
