@@ -1,10 +1,19 @@
 import { permission } from "node:process";
 import { AuthError, AuthorizationRequired } from "../auth/errors";
-import { EventError, EventNotFoundError, UnknownError, ValidationError } from "../lib/errors";
+import {
+    EventError,
+    EventNotFoundError,
+    InvalidEventFilterError,
+    InvalidEventTransitionError,
+    InvalidFieldError,
+    UnauthorizedEventActionError,
+    UnknownError,
+    ValidationError
+} from "../lib/errors";
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
-import { CreateEventData, IEvent, IRSVP, RSVPStatus } from "../types/EventTypes";
+import { CreateEventData, EventStatus, IEvent, IRSVP, RSVPStatus } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 import { UserRole } from "../auth/User";
 
@@ -20,6 +29,8 @@ export interface IEventService {
         title: string,
         description: string,
         location: string,
+        category: string,
+        status: EventStatus,
         startDatetime: Date,
         endDatetime: Date,
         capacity: number): Promise<Result<IEvent, EventError>>;
@@ -27,6 +38,15 @@ export interface IEventService {
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
     filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
+    /**
+     * Searches published upcoming events whose title, description, location, or
+     * category contains `query` as a case-insensitive substring.
+     *
+     * An empty or whitespace-only query is treated as "no filter" and returns
+     * every published event whose endDatetime is in the future. This mirrors
+     * Sprint 1's spec: empty query returns all published upcoming events.
+     */
+    searchEvents(query: string): Promise<Result<IEvent[], EventError>>;
     /**
      * Returns the 1-based position of the given user in the waitlist for the event,
      * or null if the user is not currently waitlisted. Position is ordered by
@@ -163,35 +183,36 @@ class EventService implements IEventService {
         const title = String(eventData.title ?? "").trim();
         const description = String(eventData.description ?? "").trim();
         const location = String(eventData.location ?? "").trim();
-        const { organizerId, startDatetime, endDatetime, capacity, status, attendees } = eventData;
+        const { organizerId, startDatetime, endDatetime, capacity, status, attendees, category } = eventData;
 
         if (!title) {
-            return Err(ValidationError("Title is required."));
+            return Err(InvalidFieldError("Title is required."));
         }
         if (title.length < 3) {
-            return Err(ValidationError("Title must be at least 3 characters."));
+            return Err(InvalidFieldError("Title must be at least 3 characters."));
         }
         if (!description) {
-            return Err(ValidationError("Description is required."));
+            return Err(InvalidFieldError("Description is required."));
         }
         if (!location) {
-            return Err(ValidationError("Location is required."));
+            return Err(InvalidFieldError("Location is required."));
         }
         if (!organizerId) {
-            return Err(ValidationError("Organizer is required."));
+            return Err(InvalidFieldError("Organizer is required."));
         }
         if (!startDatetime || !endDatetime) {
-            return Err(ValidationError("Start and end datetime are required."));
+            return Err(InvalidFieldError("Start and end datetime are required."));
         }
         if (endDatetime <= startDatetime) {
-            return Err(ValidationError("End datetime must be after start datetime."));
+            return Err(InvalidFieldError("End datetime must be after start datetime."));
         }
         if (capacity != null && capacity < 1) {
-            return Err(ValidationError("Capacity must be at least 1."));
+            return Err(InvalidFieldError("Capacity must be at least 1."));
         }
 
         // 2. Call repository to create event
-        const result = await this.eventRepository.createEvent({ title: title, description: description, location: location, organizerId: organizerId, startDatetime: startDatetime, endDatetime: endDatetime, capacity: capacity, status: status, attendees: attendees });
+        const result = await this.eventRepository.createEvent({ title: title, description: description, location: location, category: category, organizerId: organizerId, startDatetime: startDatetime, endDatetime: endDatetime, capacity: capacity, status: status, attendees: attendees,
+});
         this.logger.info(`Attempted to create event with title "${title}". Result: ${result.ok ? "Success" : "Error"}`);
 
         // 3. Handle repository result and return appropriate response
@@ -235,7 +256,7 @@ class EventService implements IEventService {
         }
     }
 
-    async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
+    async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, category: string, status: EventStatus, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
         const eventResult = await this.getEventEditForm(eventId, userId, userRole);
         if (!eventResult.ok) {
             // TODO: verify error
@@ -270,15 +291,14 @@ class EventService implements IEventService {
             title: title.trim(),
             description: description.trim(),
             location: location.trim(),
-            startDatetime: startDatetime!,
-            endDatetime: endDatetime!,
+            category: category.trim(),
+            status: status,
+            startDatetime: new Date(startDatetime),
+            endDatetime: new Date(endDatetime),
             capacity: capacity,
             updatedAt: new Date(),
           };
         const isUpdated = await this.eventRepository.updateEvent(eventId, update);
-        if (!isUpdated) {
-          return Err(EventNotFoundError("Event not found."));
-        } 
 
         if (!isUpdated.ok) {
             // Verify this is the correct error type
@@ -397,12 +417,12 @@ class EventService implements IEventService {
 
         if (event.organizerId !== userId) {
             this.logger.info(`Publish denied for user ${userId} on event ${eventId}: not organizer`);
-            return Err(ValidationError("Only the organizer can publish this event"));
-        }
+            return Err(UnauthorizedEventActionError("Only the organizer can publish this event"));
+        } 
 
         if (event.status !== "DRAFT") {
             this.logger.info(`Publish denied for event ${eventId}: status is ${event.status}`);
-            return Err(ValidationError("Only draft events can be published"));
+            return Err(InvalidEventTransitionError("Only draft events can be published"));
         }
 
         const updatedResult = await this.eventRepository.updateEvent(eventId, {
@@ -435,12 +455,12 @@ class EventService implements IEventService {
 
         if (!isOrganizer && !isAdmin) {
             this.logger.info(`Cancel denied for user ${userId} on event ${eventId}: not organizer or admin`);
-            return Err(ValidationError("Only the organizer or an admin can cancel this event"));
+            return Err(UnauthorizedEventActionError("Only the organizer or an admin can cancel this event"));
         }
 
         if (event.status !== "PUBLISHED") {
             this.logger.info(`Cancel denied for event ${eventId}: status is ${event.status}`);
-            return Err(ValidationError("Only published events can be cancelled"));
+            return Err(InvalidEventTransitionError("Only published events can be cancelled"));
         }
 
         const updatedResult = await this.eventRepository.updateEvent(eventId, {
@@ -478,8 +498,10 @@ class EventService implements IEventService {
         );
 
         if (category && category.trim() !== "") {
+            const normalizedCategory = category.trim().toLowerCase();
+
             filteredEvents = filteredEvents.filter(
-                (event) => (event.category ?? "").toLowerCase() === category.toLowerCase()
+                (event) => (event.category ?? "").trim().toLowerCase() === normalizedCategory
             );
         }
 
@@ -512,8 +534,53 @@ class EventService implements IEventService {
             );
         }
 
-        return Err(ValidationError("Invalid timeframe filter"));
+        return Err(InvalidEventFilterError("Invalid timeframe filter"));
     }
+
+    async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+        // Normalize once so every field comparison uses the same lowercased,
+        // trimmed form and callers don't have to worry about whitespace or case.
+        const normalized = String(query ?? "").trim().toLowerCase();
+        this.logger.info(`searchEvents called with query "${normalized}"`);
+
+        const allEventsResult = await this.eventRepository.getAllEvents();
+        if (!allEventsResult.ok) {
+            return allEventsResult;
+        }
+
+        // Apply the "published + upcoming" predicate first — same rule as
+        // filterPublishedEvents uses. Search results should never expose drafts,
+        // cancelled events, or events that have already ended.
+        const now = new Date();
+        const publishedUpcoming = allEventsResult.value.filter(
+            (event) =>
+                event.status === "PUBLISHED" &&
+                event.endDatetime.getTime() >= now.getTime()
+        );
+
+        // Spec: empty query returns all published upcoming events.
+        if (normalized === "") {
+            return Ok(publishedUpcoming);
+        }
+
+        // Spec: match against multiple fields. Case-insensitive substring match
+        // on any of title, description, location, or category is enough to
+        // include the event.
+        const matches = publishedUpcoming.filter((event) => {
+            const haystacks = [
+                event.title,
+                event.description,
+                event.location,
+                event.category ?? "",
+            ];
+            return haystacks.some((field) =>
+                field.toLowerCase().includes(normalized)
+            );
+        });
+
+        return Ok(matches);
+    }
+
     private getUpcomingWeekendRange(now: Date): { start: Date; end: Date } {
         const day = now.getDay(); // 0=Sun ... 6=Sat
         const daysUntilSaturday = day === 6 ? 0 : (6 - day + 7) % 7;

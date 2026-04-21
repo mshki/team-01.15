@@ -253,3 +253,262 @@ describe("EventService — queue position calculation", () => {
         if (!missingEvent.ok) expect(missingEvent.value.name).toBe("EventNotFoundError");
     });
 });
+describe("EventService — publish transitions", () => {
+    it("allows organizer to publish a draft event", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "DRAFT",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.publishEvent(event.id, "user-staff");
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.value.status).toBe("PUBLISHED");
+        }
+    });
+
+    it("rejects publish when user is not the organizer", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "DRAFT",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.publishEvent(event.id, "user-admin");
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("UnauthorizedEventActionError");
+            expect(result.value.message).toBe("Only the organizer can publish this event");
+        }
+    });
+
+    it("rejects publish when event is not in draft state", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "PUBLISHED",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.publishEvent(event.id, "user-staff");
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("InvalidEventTransitionError");
+            expect(result.value.message).toBe("Only draft events can be published");
+        }
+    });
+});
+
+describe("EventService — cancel transitions", () => {
+    it("allows organizer to cancel a published event", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "PUBLISHED",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.cancelEvent(event.id, "user-staff", false);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.value.status).toBe("CANCELLED");
+        }
+    });
+
+    it("allows admin to cancel another user's published event", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "PUBLISHED",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.cancelEvent(event.id, "user-admin", true);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.value.status).toBe("CANCELLED");
+        }
+    });
+
+    it("rejects cancel when user is not organizer or admin", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "PUBLISHED",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.cancelEvent(event.id, "user-reader", false);
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("UnauthorizedEventActionError");
+            expect(result.value.message).toBe("Only the organizer or an admin can cancel this event");
+        }
+    });
+});
+describe("EventService — invalid lifecycle transitions", () => {
+    it("rejects cancel when event is not published", async () => {
+        const { service } = buildService();
+        const event = await createEventForTest(service, {
+            status: "DRAFT",
+            organizerId: "user-staff",
+        });
+
+        const result = await service.cancelEvent(event.id, "user-staff", false);
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("InvalidEventTransitionError");
+            expect(result.value.message).toBe("Only published events can be cancelled");
+        }
+    });
+});
+describe("EventService — published event filters", () => {
+    it("returns all published upcoming events when no filters are provided", async () => {
+        const { service } = buildService();
+
+        await createEventForTest(service, {
+            title: "Published A",
+            status: "PUBLISHED",
+        });
+
+        await createEventForTest(service, {
+            title: "Published B",
+            status: "PUBLISHED",
+        });
+
+        await createEventForTest(service, {
+            title: "Draft Event",
+            status: "DRAFT",
+        });
+
+        const pastStart = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+        const pastEnd = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+        await createEventForTest(service, {
+            title: "Past Event",
+            status: "PUBLISHED",
+            startDatetime: pastStart,
+            endDatetime: pastEnd,
+        });
+
+        const result = await service.filterPublishedEvents();
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        const titles = result.value.map((e) => e.title);
+        expect(titles).toContain("Published A");
+        expect(titles).toContain("Published B");
+        expect(titles).not.toContain("Draft Event");
+        expect(titles).not.toContain("Past Event");
+    });
+
+    it("filters published events by category", async () => {
+        const { service } = buildService();
+
+        await createEventForTest(service, {
+            title: "Music Night",
+            status: "PUBLISHED",
+            category: "music",
+        });
+
+        await createEventForTest(service, {
+            title: "Sports Meetup",
+            status: "PUBLISHED",
+            category: "sports",
+        });
+
+        const result = await service.filterPublishedEvents("all", "music");
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        expect(result.value).toHaveLength(1);
+        expect(result.value[0]?.title).toBe("Music Night");
+    });
+});
+
+describe("EventService — timeframe filter combinations", () => {
+    it("filters published events for this week", async () => {
+        const { service } = buildService();
+
+        const soonStart = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+        const soonEnd = new Date(soonStart.getTime() + 60 * 60 * 1000);
+
+        const laterStart = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+        const laterEnd = new Date(laterStart.getTime() + 60 * 60 * 1000);
+
+        await createEventForTest(service, {
+            title: "This Week Event",
+            status: "PUBLISHED",
+            startDatetime: soonStart,
+            endDatetime: soonEnd,
+            category: "general",
+        });
+
+        await createEventForTest(service, {
+            title: "Later Event",
+            status: "PUBLISHED",
+            startDatetime: laterStart,
+            endDatetime: laterEnd,
+            category: "general",
+        });
+
+        const result = await service.filterPublishedEvents("week");
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        const titles = result.value.map((e) => e.title);
+        expect(titles).toContain("This Week Event");
+        expect(titles).not.toContain("Later Event");
+    });
+
+    it("combines timeframe and category filters", async () => {
+        const { service } = buildService();
+
+        const soonStart = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+        const soonEnd = new Date(soonStart.getTime() + 60 * 60 * 1000);
+
+        await createEventForTest(service, {
+            title: "Music This Week",
+            status: "PUBLISHED",
+            category: "music",
+            startDatetime: soonStart,
+            endDatetime: soonEnd,
+        });
+
+        await createEventForTest(service, {
+            title: "Sports This Week",
+            status: "PUBLISHED",
+            category: "sports",
+            startDatetime: soonStart,
+            endDatetime: soonEnd,
+        });
+
+        const result = await service.filterPublishedEvents("week", "music");
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        expect(result.value).toHaveLength(1);
+        expect(result.value[0]?.title).toBe("Music This Week");
+    });
+});
+describe("EventService — invalid filter input", () => {
+    it("rejects invalid timeframe values", async () => {
+        const { service } = buildService();
+
+        const result = await service.filterPublishedEvents("not-a-real-filter");
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("InvalidEventFilterError");
+            expect(result.value.message).toBe("Invalid timeframe filter");
+        }
+    });
+});
