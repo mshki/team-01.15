@@ -47,6 +47,11 @@ export interface IEventController {
         category: string | null,
         session: IAppBrowserSession
     ): Promise<void>;
+    searchEventsFromQuery(
+        res: Response,
+        query: string,
+        session: IAppBrowserSession
+    ): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -419,6 +424,45 @@ class EventController implements IEventController {
             events: result.value,
             timeframe: normalizedTimeframe,
             category,
+            session,
+            pageError: null,
+        });
+    }
+
+    async searchEventsFromQuery(
+        res: Response,
+        query: string,
+        session: IAppBrowserSession
+    ): Promise<void> {
+        this.logger.info(`Searching events with query "${query}"`);
+
+        const result = await this.eventService.searchEvents(query);
+
+        // Same error-handling shape as filterEventsFromQuery: differentiate
+        // known EventErrors from anything unexpected, and never swallow them.
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            res.status(status).render("events/partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("events/partials/error", {
+                message: "Unable to search events.",
+                layout: false,
+            });
+            return;
+        }
+
+        // Pass the ORIGINAL query string (not a normalized version) back to the
+        // view so the input field can re-populate with exactly what the user
+        // typed. The service handled normalization internally.
+        res.render("events/search", {
+            events: result.value,
+            query,
             session,
             pageError: null,
         });

@@ -28,6 +28,15 @@ export interface IEventService {
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
     filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
     /**
+     * Searches published upcoming events whose title, description, location, or
+     * category contains `query` as a case-insensitive substring.
+     *
+     * An empty or whitespace-only query is treated as "no filter" and returns
+     * every published event whose endDatetime is in the future. This mirrors
+     * Sprint 1's spec: empty query returns all published upcoming events.
+     */
+    searchEvents(query: string): Promise<Result<IEvent[], EventError>>;
+    /**
      * Returns the 1-based position of the given user in the waitlist for the event,
      * or null if the user is not currently waitlisted. Position is ordered by
      * createdAt (earliest join is #1).
@@ -514,6 +523,51 @@ class EventService implements IEventService {
 
         return Err(ValidationError("Invalid timeframe filter"));
     }
+
+    async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+        // Normalize once so every field comparison uses the same lowercased,
+        // trimmed form and callers don't have to worry about whitespace or case.
+        const normalized = String(query ?? "").trim().toLowerCase();
+        this.logger.info(`searchEvents called with query "${normalized}"`);
+
+        const allEventsResult = await this.eventRepository.getAllEvents();
+        if (!allEventsResult.ok) {
+            return allEventsResult;
+        }
+
+        // Apply the "published + upcoming" predicate first — same rule as
+        // filterPublishedEvents uses. Search results should never expose drafts,
+        // cancelled events, or events that have already ended.
+        const now = new Date();
+        const publishedUpcoming = allEventsResult.value.filter(
+            (event) =>
+                event.status === "PUBLISHED" &&
+                event.endDatetime.getTime() >= now.getTime()
+        );
+
+        // Spec: empty query returns all published upcoming events.
+        if (normalized === "") {
+            return Ok(publishedUpcoming);
+        }
+
+        // Spec: match against multiple fields. Case-insensitive substring match
+        // on any of title, description, location, or category is enough to
+        // include the event.
+        const matches = publishedUpcoming.filter((event) => {
+            const haystacks = [
+                event.title,
+                event.description,
+                event.location,
+                event.category ?? "",
+            ];
+            return haystacks.some((field) =>
+                field.toLowerCase().includes(normalized)
+            );
+        });
+
+        return Ok(matches);
+    }
+
     private getUpcomingWeekendRange(now: Date): { start: Date; end: Date } {
         const day = now.getDay(); // 0=Sun ... 6=Sat
         const daysUntilSaturday = day === 6 ? 0 : (6 - day + 7) % 7;
