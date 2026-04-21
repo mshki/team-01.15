@@ -366,3 +366,57 @@ describe("EventService — invalid lifecycle transitions", () => {
         }
     });
 });
+describe("EventService — published event filters", () => {
+    it("returns all published upcoming events when no filters are provided", async () => {
+        const { service } = buildService();
+
+        await createEventForTest(service, {
+            title: "Published A",
+            status: "PUBLISHED",
+        });
+
+        await createEventForTest(service, {
+            title: "Published B",
+            status: "PUBLISHED",
+        });
+
+        await createEventForTest(service, {
+            title: "Draft Event",
+            status: "DRAFT",
+        });
+
+        const result = await service.filterPublishedEvents();
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        const titles = result.value.map((e) => e.title);
+        expect(titles).toContain("Published A");
+        expect(titles).toContain("Published B");
+        expect(titles).not.toContain("Draft Event");
+    });
+
+    it("filters published events by category", async () => {
+        const { service } = buildService();
+
+        await createEventForTest(service, {
+            title: "Music Night",
+            status: "PUBLISHED",
+            category: "music",
+        });
+
+        await createEventForTest(service, {
+            title: "Sports Meetup",
+            status: "PUBLISHED",
+            category: "sports",
+        });
+
+        const result = await service.filterPublishedEvents("all", "music");
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        expect(result.value).toHaveLength(1);
+        expect(result.value[0]?.title).toBe("Music Night");
+    });
+});
