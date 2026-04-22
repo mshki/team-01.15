@@ -84,6 +84,7 @@ class EventController implements IEventController {
         if (error.name === "InvalidFieldError") return 400;
         if (error.name === "InvalidSearchQueryError") return 400;
         if (error.name === "InvalidEventFilterError") return 400;
+        if (error.name === "ForbiddenError" || error.name === "UnauthorizedEventActionError" || error.name === "UnauthorizedError") return 403;
         if (error.name === "InvalidRSVPError") return 404;
         if (error.name === "UnauthorizedRSVPError") return 403;
         return 500;
@@ -264,15 +265,13 @@ class EventController implements IEventController {
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Load edit form failed: ${result.value.message}`);
 
-            res.status(status).render("events/partials/error", {
+            res.status(status).render("partials/error", {
                 message: result.value.message,
                 layout: false,
             });
             return;
-        }
-
-        if (!result.ok) {
-            res.status(500).render("events/partials/error", {
+        } else if (!result.ok) {
+            res.status(500).render("partials/error", {
               message: "Unable to load event for editing.",
               layout: false,
             });
@@ -299,34 +298,6 @@ class EventController implements IEventController {
         capacity: number,
         session: IAppBrowserSession
       ): Promise<void> {
-
-        const currEvent = await this.eventService.getEventDetails(id);
-
-        if (!currEvent.ok && this.isEventError(currEvent.value)) {
-            const status = this.mapErrorStatus(currEvent.value);
-            const log = status === 400 ? this.logger.warn : this.logger.error;
-            log.call(this.logger, `Edit event failed: ${currEvent.value.message}`);
-            res.redirect('/events');
-            return;
-        } else if (!currEvent.ok) {
-            res.status(500).render("partials/error", {
-                message: "Unable to update event.",
-                layout: false,
-            });
-            return;
-        }
-
-        const currentUser = session.authenticatedUser;
-        const isAdmin = currentUser?.role === "admin";
-        const isOrganizer = currentUser?.userId === currEvent.value.organizerId;
-
-        if (!isAdmin && !isOrganizer) {
-            res.status(403).render("partials/error", {
-                message: "User does not have access to edit this event.",
-                layout: false,
-              });
-              return;
-        }
 
         this.logger.info(`Attempting to edit event ${id}...`);
 
@@ -366,9 +337,7 @@ class EventController implements IEventController {
                 layout: false,
             });
             return;
-        }
-      
-        if (!result.ok) {
+        } else if (!result.ok) {
             res.status(500).render("partials/error", {
                 message: "Unable to update event.",
                 layout: false,
@@ -379,8 +348,6 @@ class EventController implements IEventController {
         this.logger.info(`Event ${id} updated successfully. Redirecting...`);
       
         res.setHeader("HX-Location", `/events/${id}`);
-
-        // TODO: is this the right HTTP code?
         res.status(200).send();
       }
 

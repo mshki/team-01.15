@@ -1,6 +1,7 @@
 import { permission } from "node:process";
 import { AuthError, AuthorizationRequired } from "../auth/errors";
 import {
+    DatabaseError,
     EventError,
     EventNotFoundError,
     InvalidEventFilterError,
@@ -26,7 +27,7 @@ import { UserRole } from "../auth/User";
 export interface IEventService {
     createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
-    getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError | AuthError>>;
+    getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError>>;
     updateEvent(eventId: number, 
         userId: string,
         userRole: string,
@@ -61,30 +62,6 @@ export interface IEventService {
 
 class EventService implements IEventService {
     constructor(private readonly eventRepository: IEventRepository, private readonly logger: ILoggingService) {}
-
-    private canEditEvent(event: IEvent, userId: string, userRole: string): Result<null, EventError | AuthError> {
-        const isAdmin = userRole=== "admin";
-        const isOwner = event.organizerId === userId;
-    
-        if (userRole === "user" && !isOwner) {
-            return Err(AuthorizationRequired("Only owner can edit events."));
-        }
-    
-        if (!isAdmin && !isOwner) {
-            return Err(AuthorizationRequired("Need permission to edit this event."));
-        }
-    
-        const now = new Date();
-        if (event.status === "CANCELLED" || event.status === "CONCLUDED") {
-            return Err(ValidationError("Cancelled or concluded events cannot be edited."));
-        }
-    
-        if (event.endDatetime.getTime() < now.getTime()) {
-            return Err(ValidationError("Past events cannot be edited."));
-        }
-    
-        return Ok(null);
-    }
 
     private countGoing(attendees: IRSVP[]): number {
         return attendees.filter((r) => r.rsvpStatus === "GOING").length;
@@ -213,24 +190,37 @@ class EventService implements IEventService {
         return Ok(result.value);
     }
 
-    async getEventEditForm(eventId: number, userId: string, userRole: string): Promise<Result<IEvent, EventError | AuthError>> {
-        const event = await this.eventRepository.getEventById(eventId);
+    async getEventEditForm(eventId: number, userId: string, userRole: string): Promise<Result<IEvent, EventError>> {
+        const eventResponse = await this.eventRepository.getEventById(eventId);
 
-        if (event.ok) {
-            const permissionCheck = this.canEditEvent(event.value, userId, userRole);
-            if (permissionCheck.ok) {
-                return Ok(event.value);
-            } else return permissionCheck;
-        } else {
+        if (!eventResponse.ok) {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         }
+
+        const event = eventResponse.value;
+        const isAdmin = userRole=== "admin";
+        const isOwner = event.organizerId === userId;
+    
+        if (!isAdmin && !isOwner) {
+            return Err(UnauthorizedEventActionError("Need permission to edit this event."));
+        }
+    
+        const now = new Date();
+        if (event.status === "CANCELLED" || event.status === "CONCLUDED") {
+            return Err(ValidationError("Cancelled or concluded events cannot be edited."));
+        }
+    
+        if (event.endDatetime.getTime() < now.getTime()) {
+            return Err(ValidationError("Past events cannot be edited."));
+        }
+
+        return Ok(event);
     }
 
     async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, category: string, status: EventStatus, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
         const eventResult = await this.getEventEditForm(eventId, userId, userRole);
         if (!eventResult.ok) {
-            // TODO: verify error
-          return Err(ValidationError("Cannot edit event."));
+          return eventResult;
         }
 
         if (!title) {
@@ -271,8 +261,7 @@ class EventService implements IEventService {
         const isUpdated = await this.eventRepository.updateEvent(eventId, update);
 
         if (!isUpdated.ok) {
-            // Verify this is the correct error type
-            return Err(ValidationError("Failed to update event."))
+            return Err(DatabaseError("Failed to update event."))
         }
         return Ok(isUpdated.value);
     }
