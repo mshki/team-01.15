@@ -326,9 +326,7 @@ class EventController implements IEventController {
                 layout: false,
             });
             return;
-        }
-      
-        if (!result.ok) {
+        } else if (!result.ok) {
             res.status(500).render("partials/error", {
                 message: "Unable to update event.",
                 layout: false,
