@@ -1,3 +1,7 @@
+<% if (typeof pageError !== 'undefined' && pageError) { %>
+  <%- include("../partials/error", { message: pageError }) %>
+<% } %>
+
 <%- include("./rsvp-panel", {
   event,
   session,
