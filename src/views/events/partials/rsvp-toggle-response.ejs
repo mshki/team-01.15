@@ -1,4 +1,6 @@
-<div id="page-error-container" hx-swap-oob="true"></div>
+<% if (typeof pageError !== 'undefined' && pageError) { %>
+  <%- include("../partials/error", { message: pageError }) %>
+<% } %>
 
 <%- include("./rsvp-panel", {
   event,
