@@ -392,10 +392,8 @@ class EventController implements IEventController {
             const status = this.mapErrorStatus(error);
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Toggle RSVP failed: ${error.message}`);
-            res.status(status).render("events/partials/rsvp-toggle-response", {
-                event: null,             
-                pageError: result.value.message,   
-                session,
+            res.status(status).render("partials/error", {
+                message: result.value.message,   
                 layout: false,
             });
             return;
