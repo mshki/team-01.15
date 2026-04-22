@@ -573,6 +573,24 @@ class EventController implements IEventController {
         // Pass the ORIGINAL query string (not a normalized version) back to the
         // view so the input field can re-populate with exactly what the user
         // typed. The service handled normalization internally.
+        //
+        // HTMX flow: when the search input fires its debounced request, HTMX
+        // sends an "HX-Request: true" header. In that case we only need to
+        // return the results partial — the browser will swap just the
+        // #search-results section, keeping the page chrome and input focus
+        // intact. For a regular (non-HTMX) GET we render the full page so
+        // bookmarks, shares, and non-JS clients still work.
+        const isHtmx = res.req.get("HX-Request") === "true";
+        if (isHtmx) {
+            res.render("events/partials/search-results", {
+                events: result.value,
+                query,
+                session,
+                layout: false,
+            });
+            return;
+        }
+
         res.render("events/search", {
             events: result.value,
             query,
