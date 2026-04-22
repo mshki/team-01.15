@@ -1,12 +1,17 @@
 import { permission } from "node:process";
 import { AuthError, AuthorizationRequired } from "../auth/errors";
 import {
+    DatabaseError,
     EventError,
     EventNotFoundError,
     InvalidEventFilterError,
     InvalidEventTransitionError,
     InvalidFieldError,
+    InvalidRSVPError,
+    InvalidSearchQueryError,
+    RSVPError,
     UnauthorizedEventActionError,
+    UnauthorizedRSVPError,
     UnknownError,
     ValidationError
 } from "../lib/errors";
@@ -22,7 +27,7 @@ import { UserRole } from "../auth/User";
 export interface IEventService {
     createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
-    getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError | AuthError>>;
+    getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError>>;
     updateEvent(eventId: number, 
         userId: string,
         userRole: string,
@@ -34,7 +39,7 @@ export interface IEventService {
         startDatetime: Date,
         endDatetime: Date,
         capacity: number): Promise<Result<IEvent, EventError>>;
-    toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError>>;
+    toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError | RSVPError>>;
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
     filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
@@ -57,64 +62,6 @@ export interface IEventService {
 
 class EventService implements IEventService {
     constructor(private readonly eventRepository: IEventRepository, private readonly logger: ILoggingService) {}
-
-    private canEditEvent(event: IEvent, userId: string, userRole: string): Result<null, EventError | AuthError> {
-        const isAdmin = userRole=== "admin";
-        const isOwner = event.organizerId === userId;
-    
-        if (userRole === "user" && !isOwner) {
-            return Err(AuthorizationRequired("Only owner can edit events."));
-        }
-    
-        if (!isAdmin && !isOwner) {
-            return Err(AuthorizationRequired("Need permission to edit this event."));
-        }
-    
-        const now = new Date();
-        if (event.status === "CANCELLED" || event.status === "CONCLUDED") {
-            return Err(ValidationError("Cancelled or concluded events cannot be edited."));
-        }
-    
-        if (event.endDatetime.getTime() < now.getTime()) {
-            return Err(ValidationError("Past events cannot be edited."));
-        }
-    
-        return Ok(null);
-    }
-
-    private canRsvp(event: IEvent, userId: string, userRole: UserRole): Result<void, EventError> {
-        if (userRole === "admin") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Only members can RSVP to events."));
-        }
-
-        if (event.organizerId === userId) {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Organizers cannot RSVP to their own events."));
-        }
-
-        if (event.status === "CANCELLED") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Cancelled events cannot receive RSVPs."));
-        }
-
-        if (event.status === "CONCLUDED") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Concluded events cannot receive RSVPs."));
-        }
-    
-        if (event.status !== "PUBLISHED") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Only published events can receive RSVPs."));
-        }
-
-        if (new Date(event.endDatetime).getTime() <= new Date().getTime()) {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Past events cannot receive RSVPs."));
-        }
-    
-        return Ok(undefined);
-    }
 
     private countGoing(attendees: IRSVP[]): number {
         return attendees.filter((r) => r.rsvpStatus === "GOING").length;
@@ -243,24 +190,37 @@ class EventService implements IEventService {
         return Ok(result.value);
     }
 
-    async getEventEditForm(eventId: number, userId: string, userRole: string): Promise<Result<IEvent, EventError | AuthError>> {
-        const event = await this.eventRepository.getEventById(eventId);
+    async getEventEditForm(eventId: number, userId: string, userRole: string): Promise<Result<IEvent, EventError>> {
+        const eventResponse = await this.eventRepository.getEventById(eventId);
 
-        if (event.ok) {
-            const permissionCheck = this.canEditEvent(event.value, userId, userRole);
-            if (permissionCheck.ok) {
-                return Ok(event.value);
-            } else return permissionCheck;
-        } else {
+        if (!eventResponse.ok) {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         }
+
+        const event = eventResponse.value;
+        const isAdmin = userRole=== "admin";
+        const isOwner = event.organizerId === userId;
+    
+        if (!isAdmin && !isOwner) {
+            return Err(UnauthorizedEventActionError("Need permission to edit this event."));
+        }
+    
+        const now = new Date();
+        if (event.status === "CANCELLED" || event.status === "CONCLUDED") {
+            return Err(ValidationError("Cancelled or concluded events cannot be edited."));
+        }
+    
+        if (event.endDatetime.getTime() < now.getTime()) {
+            return Err(ValidationError("Past events cannot be edited."));
+        }
+
+        return Ok(event);
     }
 
     async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, category: string, status: EventStatus, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
         const eventResult = await this.getEventEditForm(eventId, userId, userRole);
         if (!eventResult.ok) {
-            // TODO: verify error
-          return Err(ValidationError("Cannot edit event."));
+          return eventResult;
         }
 
         if (!title) {
@@ -301,29 +261,51 @@ class EventService implements IEventService {
         const isUpdated = await this.eventRepository.updateEvent(eventId, update);
 
         if (!isUpdated.ok) {
-            // Verify this is the correct error type
-            return Err(ValidationError("Failed to update event."))
+            return Err(DatabaseError("Failed to update event."))
         }
         return Ok(isUpdated.value);
     }
 
-    async toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError>> {
+    async toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError | RSVPError>> {
         const getEvent = await this.eventRepository.getEventById(eventId);
         if (!getEvent.ok) {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         }
         const event = getEvent.value
-        const now = new Date();
       
-        const allowed = this.canRsvp(event, userId, userRole);
-        if (!allowed.ok) {
-            // TODO: rsvp error logic
-            return Err(UnknownError("TODO"));
+        if (userRole === "admin") {
+            return Err(UnauthorizedRSVPError("Only members can RSVP to events."));
+        }
+        
+        if (event.organizerId === userId) {
+            return Err(UnauthorizedRSVPError("Organizers cannot RSVP to their own events."));
+        }
+        if (event.status === "CANCELLED") {
+            return Err(InvalidRSVPError("Cancelled events cannot receive RSVPs."));
+        }
+
+        if (event.status === "CONCLUDED") {
+            return Err(InvalidRSVPError("Concluded events cannot receive RSVPs."));
+        }
+    
+        if (event.status !== "PUBLISHED") {
+            return Err(InvalidRSVPError("Only published events can receive RSVPs."));
+        }
+
+        if (new Date(event.endDatetime).getTime() <= new Date().getTime()) {
+            return Err(InvalidRSVPError("Past events cannot receive RSVPs."));
         }
       
         const existing = await this.eventRepository.findUserRsvp(eventId, userId);
         let updatedRsvp: IRSVP;
         if (!existing.ok) {
+            // TODO: inspect logic, this is really repetitive right now, but I can't think of
+                // a much better way to do this right now
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        } 
+
+        if (!existing.value) {
+            // the case of null return from service
             const status = this.nextJoinStatus(event);
       
             updatedRsvp = {
@@ -538,9 +520,29 @@ class EventService implements IEventService {
     }
 
     async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+        // Validate input *before* normalizing so we can distinguish "user gave us
+        // something we refuse to accept" from "the input is just empty/whitespace."
+        //
+        // Two guards:
+        //   1. Runtime non-string defense. The signature is typed `string` and
+        //      the /events/search route already coerces req.query.q to a string,
+        //      but a direct service caller (tests, other code) could still pass
+        //      something else. Reject it explicitly rather than relying on the
+        //      caller to behave.
+        //   2. Length cap. 200 characters is well beyond any realistic search
+        //      intent and guards the server against trivially abusive inputs.
+        if (typeof query !== "string") {
+            return Err(InvalidSearchQueryError("Search query must be a string."));
+        }
+        if (query.length > 200) {
+            return Err(
+                InvalidSearchQueryError("Search query is too long (max 200 characters).")
+            );
+        }
+
         // Normalize once so every field comparison uses the same lowercased,
         // trimmed form and callers don't have to worry about whitespace or case.
-        const normalized = String(query ?? "").trim().toLowerCase();
+        const normalized = query.trim().toLowerCase();
         this.logger.info(`searchEvents called with query "${normalized}"`);
 
         const allEventsResult = await this.eventRepository.getAllEvents();

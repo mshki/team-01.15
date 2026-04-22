@@ -57,7 +57,7 @@ class InMemoryEventRepository implements IEventRepository {
         return Ok(undefined);
     }
 
-    async findUserRsvp(id: number, userId: string): Promise<Result<IRSVP, EventError>> {
+    async findUserRsvp(id: number, userId: string): Promise<Result<IRSVP | null, EventError>> {
         const event = this.events.get(id);
         if (!event) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
@@ -68,8 +68,7 @@ class InMemoryEventRepository implements IEventRepository {
         );
       
         if (!rsvp) {
-            // TODO: fix error logic
-            return Err(EventNotFoundError("TODO"));
+            return Ok(null);
         }
       
         return Ok({

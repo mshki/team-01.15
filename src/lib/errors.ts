@@ -8,6 +8,7 @@ export type EventError =
     | { name: "UnauthorizedError"; message: string }
     | { name: "ForbiddenError"; message: string }
     | { name: "InvalidFieldError"; message: string }
+    | { name: "InvalidSearchQueryError"; message: string }
     | { name: "InvalidEventFilterError"; message: string };
 
 export const EventNotFoundError = (message: string): EventError => ({
@@ -55,7 +56,26 @@ export const InvalidFieldError = (message: string): EventError => ({
     message,
 });
 
+export const InvalidSearchQueryError = (message: string): EventError => ({
+    name: "InvalidSearchQueryError",
+    message,
+});
+
 export const InvalidEventFilterError = (message: string): EventError => ({
     name: "InvalidEventFilterError",
     message,
+});
+
+export type RSVPError =
+  | { name: "UnauthorizedRSVPError"; message: string }
+  | { name: "InvalidRSVPError"; message: string }
+
+export const UnauthorizedRSVPError = (message: string): RSVPError => ({
+  name: "UnauthorizedRSVPError",
+  message,
+});
+
+export const InvalidRSVPError = (message: string): RSVPError => ({
+  name: "InvalidRSVPError",
+  message,
 });

@@ -2,7 +2,7 @@ import type { Response } from "express";
 import { IEventService } from "../service/EventService";
 import { ILoggingService } from "../service/LoggingService";
 import { IAppBrowserSession, IAuthenticatedUserSession } from "../session/AppSession";
-import { EventError } from "../lib/errors";
+import { EventError, RSVPError } from "../lib/errors";
 import { IApp } from "../contracts";
 import { stat } from "node:fs";
 import { EventStatus } from "../types/EventTypes";
@@ -69,11 +69,24 @@ class EventController implements IEventController {
         );
     }
 
-    private mapErrorStatus(error: EventError): number {
+    private isRSVPError(value: unknown): value is RSVPError {
+        return (
+            typeof value === "object" &&
+            value !== null &&
+            "name" in value &&
+            "message" in value
+        );
+    }
+
+    private mapErrorStatus(error: EventError | RSVPError): number {
         if (error.name === "EventNotFoundError") return 404;
         if (error.name === "ValidationError") return 400;
         if (error.name === "InvalidFieldError") return 400;
+        if (error.name === "InvalidSearchQueryError") return 400;
         if (error.name === "InvalidEventFilterError") return 400;
+        if (error.name === "ForbiddenError" || error.name === "UnauthorizedEventActionError" || error.name === "UnauthorizedError") return 403;
+        if (error.name === "InvalidRSVPError") return 404;
+        if (error.name === "UnauthorizedRSVPError") return 403;
         return 500;
 }
     
@@ -227,6 +240,8 @@ class EventController implements IEventController {
 
         this.logger.info(`Rendering event details for event ${eventId} (status: ${event.status})`);
 
+        const isHtmx = res.req.get("HX-Request") === "true";
+
         res.render("events/show", {
             event,
             session,
@@ -236,6 +251,7 @@ class EventController implements IEventController {
             userRsvp,
             queuePosition,
             pageError: null,
+            layout: isHtmx ? false : undefined,
         });
     }
 
@@ -249,15 +265,13 @@ class EventController implements IEventController {
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Load edit form failed: ${result.value.message}`);
 
-            res.status(status).render("events/partials/error", {
+            res.status(status).render("partials/error", {
                 message: result.value.message,
                 layout: false,
             });
             return;
-        }
-
-        if (!result.ok) {
-            res.status(500).render("events/partials/error", {
+        } else if (!result.ok) {
+            res.status(500).render("partials/error", {
               message: "Unable to load event for editing.",
               layout: false,
             });
@@ -284,34 +298,6 @@ class EventController implements IEventController {
         capacity: number,
         session: IAppBrowserSession
       ): Promise<void> {
-
-        const currEvent = await this.eventService.getEventDetails(id);
-
-        if (!currEvent.ok && this.isEventError(currEvent.value)) {
-            const status = this.mapErrorStatus(currEvent.value);
-            const log = status === 400 ? this.logger.warn : this.logger.error;
-            log.call(this.logger, `Edit event failed: ${currEvent.value.message}`);
-            res.redirect('/events');
-            return;
-        } else if (!currEvent.ok) {
-            res.status(500).render("partials/error", {
-                message: "Unable to update event.",
-                layout: false,
-            });
-            return;
-        }
-
-        const currentUser = session.authenticatedUser;
-        const isAdmin = currentUser?.role === "admin";
-        const isOrganizer = currentUser?.userId === currEvent.value.organizerId;
-
-        if (!isAdmin && !isOrganizer) {
-            res.status(403).render("partials/error", {
-                message: "User does not have access to edit this event.",
-                layout: false,
-              });
-              return;
-        }
 
         this.logger.info(`Attempting to edit event ${id}...`);
 
@@ -351,9 +337,7 @@ class EventController implements IEventController {
                 layout: false,
             });
             return;
-        }
-      
-        if (!result.ok) {
+        } else if (!result.ok) {
             res.status(500).render("partials/error", {
                 message: "Unable to update event.",
                 layout: false,
@@ -370,13 +354,19 @@ class EventController implements IEventController {
     async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
         const result = await this.eventService.toggleRsvp(eventId, user.userId, user.role);
 
-        if (!result.ok) {
-            const error = result.value as EventError;
+        if (!result.ok && (this.isEventError(result.value) || this.isRSVPError(result.value))) {
+            const error = result.value as EventError | RSVPError;
             const status = this.mapErrorStatus(error);
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Toggle RSVP failed: ${error.message}`);
-            res.status(status).render("events/partials/rsvp-error-response", {
-                message: error.message,
+            res.status(status).render("partials/error", {
+                message: result.value.message,   
+                layout: false,
+            });
+            return;
+        } else if (!result.ok) {
+            res.status(500).render("partials/error", {
+                message: "Unable to rsvp for event.",
                 layout: false,
             });
             return;
@@ -475,19 +465,14 @@ class EventController implements IEventController {
             `Filtering events with timeframe "${timeframe}" and category "${category ?? "all"}"`
         );
 
-        const normalizedTimeframe =
-            timeframe === "all" || timeframe === "week" || timeframe === "weekend"
-                ? timeframe
-                : "all";
-
         const result = await this.eventService.filterPublishedEvents(
-            normalizedTimeframe,
+            timeframe,
             category
         );
 
         if (!result.ok && this.isEventError(result.value)) {
             const status = this.mapErrorStatus(result.value);
-            res.status(status).render("events/partials/error", {
+            res.status(status).render("partials/error", {
                 message: result.value.message,
                 layout: false,
             });
@@ -495,7 +480,7 @@ class EventController implements IEventController {
         }
 
         if (!result.ok) {
-            res.status(500).render("events/partials/error", {
+            res.status(500).render("partials/error", {
                 message: "Unable to filter events.",
                 layout: false,
             });
@@ -515,11 +500,11 @@ class EventController implements IEventController {
 
         res.render("events/index", {
             events: result.value,
-            timeframe: normalizedTimeframe,
+            timeframe,
             category,
             session,
             pageError: null,
-        });
+});
     }
 
     async searchEventsFromQuery(
@@ -553,6 +538,24 @@ class EventController implements IEventController {
         // Pass the ORIGINAL query string (not a normalized version) back to the
         // view so the input field can re-populate with exactly what the user
         // typed. The service handled normalization internally.
+        //
+        // HTMX flow: when the search input fires its debounced request, HTMX
+        // sends an "HX-Request: true" header. In that case we only need to
+        // return the results partial — the browser will swap just the
+        // #search-results section, keeping the page chrome and input focus
+        // intact. For a regular (non-HTMX) GET we render the full page so
+        // bookmarks, shares, and non-JS clients still work.
+        const isHtmx = res.req.get("HX-Request") === "true";
+        if (isHtmx) {
+            res.render("events/partials/search-results", {
+                events: result.value,
+                query,
+                session,
+                layout: false,
+            });
+            return;
+        }
+
         res.render("events/search", {
             events: result.value,
             query,

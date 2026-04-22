@@ -5,7 +5,6 @@
   const suffix = typeof idSuffix !== 'undefined' && idSuffix !== null ? `-${idSuffix}` : '';
   const panelId = `rsvp-panel${suffix}`;
   const formId = `rsvp-form${suffix}`;
-  const oobAttr = oob ? ' hx-swap-oob="true"' : '';
 
   const userRsvp = currentUser
     ? attendees.find((a) => a.userId === currentUser.userId) ?? null
@@ -28,7 +27,7 @@
         : 'Your RSVP is cancelled.');
 %>
 
-<section id="<%= panelId %>"<%- oobAttr %> class="p-5 border border-slate-200 rounded-2xl bg-white shadow-lg">
+<section id="<%= panelId %>" class="p-5 border border-slate-200 rounded-2xl bg-white shadow-lg">
   <h4 class="text-base font-semibold text-slate-900 mb-2">Your RSVP</h4>
 
   <p class="text-slate-600 text-sm mb-4"><%= helpText %></p>
@@ -38,7 +37,8 @@
     method="post"
     action="/events/<%= event.id %>/rsvp/toggle"
     hx-post="/events/<%= event.id %>/rsvp/toggle"
-    hx-swap="none"
+    hx-target="#<%= panelId %>"
+    hx-swap="outerHTML"
   >
     <button
       type="submit"
