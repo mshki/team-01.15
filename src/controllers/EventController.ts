@@ -254,15 +254,13 @@ class EventController implements IEventController {
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Load edit form failed: ${result.value.message}`);
 
-            res.status(status).render("events/partials/error", {
+            res.status(status).render("partials/error", {
                 message: result.value.message,
                 layout: false,
             });
             return;
-        }
-
-        if (!result.ok) {
-            res.status(500).render("events/partials/error", {
+        } else if (!result.ok) {
+            res.status(500).render("partials/error", {
               message: "Unable to load event for editing.",
               layout: false,
             });
