@@ -6,9 +6,11 @@ import {
     InvalidEventFilterError,
     InvalidEventTransitionError,
     InvalidFieldError,
+    InvalidRSVPError,
     InvalidSearchQueryError,
     RSVPError,
     UnauthorizedEventActionError,
+    UnauthorizedRSVPError,
     UnknownError,
     ValidationError
 } from "../lib/errors";
@@ -82,40 +84,6 @@ class EventService implements IEventService {
         }
     
         return Ok(null);
-    }
-
-    private canRsvp(event: IEvent, userId: string, userRole: UserRole): Result<void, EventError> {
-        if (userRole === "admin") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Only members can RSVP to events."));
-        }
-
-        if (event.organizerId === userId) {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Organizers cannot RSVP to their own events."));
-        }
-
-        if (event.status === "CANCELLED") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Cancelled events cannot receive RSVPs."));
-        }
-
-        if (event.status === "CONCLUDED") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Concluded events cannot receive RSVPs."));
-        }
-    
-        if (event.status !== "PUBLISHED") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Only published events can receive RSVPs."));
-        }
-
-        if (new Date(event.endDatetime).getTime() <= new Date().getTime()) {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Past events cannot receive RSVPs."));
-        }
-    
-        return Ok(undefined);
     }
 
     private countGoing(attendees: IRSVP[]): number {
@@ -315,17 +283,40 @@ class EventService implements IEventService {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         }
         const event = getEvent.value
-        const now = new Date();
       
-        const allowed = this.canRsvp(event, userId, userRole);
-        if (!allowed.ok) {
-            // TODO: rsvp error logic
-            return Err(UnknownError("TODO"));
+        if (userRole === "admin") {
+            return Err(UnauthorizedRSVPError("Only members can RSVP to events."));
+        }
+        
+        if (event.organizerId === userId) {
+            return Err(UnauthorizedRSVPError("Organizers cannot RSVP to their own events."));
+        }
+        if (event.status === "CANCELLED") {
+            return Err(InvalidRSVPError("Cancelled events cannot receive RSVPs."));
+        }
+
+        if (event.status === "CONCLUDED") {
+            return Err(InvalidRSVPError("Concluded events cannot receive RSVPs."));
+        }
+    
+        if (event.status !== "PUBLISHED") {
+            return Err(InvalidRSVPError("Only published events can receive RSVPs."));
+        }
+
+        if (new Date(event.endDatetime).getTime() <= new Date().getTime()) {
+            return Err(InvalidRSVPError("Past events cannot receive RSVPs."));
         }
       
         const existing = await this.eventRepository.findUserRsvp(eventId, userId);
         let updatedRsvp: IRSVP;
         if (!existing.ok) {
+            // TODO: inspect logic, this is really repetitive right now, but I can't think of
+                // a much better way to do this right now
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        } 
+
+        if (!existing.value) {
+            // the case of null return from service
             const status = this.nextJoinStatus(event);
       
             updatedRsvp = {
