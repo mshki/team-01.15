@@ -7,6 +7,7 @@ import {
     InvalidEventTransitionError,
     InvalidFieldError,
     InvalidSearchQueryError,
+    RSVPError,
     UnauthorizedEventActionError,
     UnknownError,
     ValidationError
@@ -35,7 +36,7 @@ export interface IEventService {
         startDatetime: Date,
         endDatetime: Date,
         capacity: number): Promise<Result<IEvent, EventError>>;
-    toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError>>;
+    toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError | RSVPError>>;
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
     filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
@@ -308,7 +309,7 @@ class EventService implements IEventService {
         return Ok(isUpdated.value);
     }
 
-    async toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError>> {
+    async toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError | RSVPError>> {
         const getEvent = await this.eventRepository.getEventById(eventId);
         if (!getEvent.ok) {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));

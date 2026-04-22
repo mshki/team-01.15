@@ -1,6 +1,6 @@
 import { EventNotFoundError, DatabaseError } from "../lib/errors";
 import { Err, Ok, type Result } from "../lib/result";
-import type { EventError } from "../lib/errors";
+import type { EventError, RSVPError } from "../lib/errors";
 import type { IEventRepository } from "./EventRepository";
 import { CreateEventData, Event, IRSVP, type IEvent } from "../types/EventTypes";
 
@@ -57,7 +57,7 @@ class InMemoryEventRepository implements IEventRepository {
         return Ok(undefined);
     }
 
-    async findUserRsvp(id: number, userId: string): Promise<Result<IRSVP, EventError>> {
+    async findUserRsvp(id: number, userId: string): Promise<Result<IRSVP | null, EventError | RSVPError>> {
         const event = this.events.get(id);
         if (!event) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
@@ -68,8 +68,7 @@ class InMemoryEventRepository implements IEventRepository {
         );
       
         if (!rsvp) {
-            // TODO: fix error logic
-            return Err(EventNotFoundError("TODO"));
+            return Ok(null);
         }
       
         return Ok({
