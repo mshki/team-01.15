@@ -512,3 +512,196 @@ describe("EventService — invalid filter input", () => {
         }
     });
 });
+
+/**
+ * Tests for Feature 10 Sprint 2 — Event Search.
+ *
+ * Sprint 2 spec: "Write tests covering matching results, no results, empty
+ * queries, and invalid input." Each describe block below maps to one of those
+ * four categories.
+ *
+ * These tests exercise searchEvents through the public service surface against
+ * the in-memory repository, matching the testing pattern used elsewhere in
+ * this file. Queries are chosen to avoid any field on the seeded
+ * "Team Kickoff 2026" event so its presence doesn't pollute assertions.
+ */
+describe("EventService — search matching results", () => {
+    it("matches the query against the title as a case-insensitive substring", async () => {
+        const { service } = buildService();
+        await createEventForTest(service, { title: "Jazz Night", status: "PUBLISHED" });
+        await createEventForTest(service, { title: "Book Club", status: "PUBLISHED" });
+
+        // Lowercase query.
+        const lower = await service.searchEvents("jazz");
+        expect(lower.ok).toBe(true);
+        if (!lower.ok) return;
+        expect(lower.value.map((e) => e.title)).toEqual(["Jazz Night"]);
+
+        // Same query, different case — behavior must be identical.
+        const upper = await service.searchEvents("JAZZ");
+        expect(upper.ok).toBe(true);
+        if (!upper.ok) return;
+        expect(upper.value.map((e) => e.title)).toEqual(["Jazz Night"]);
+
+        // Partial-substring match (not a full word).
+        const partial = await service.searchEvents("azz");
+        expect(partial.ok).toBe(true);
+        if (!partial.ok) return;
+        expect(partial.value.map((e) => e.title)).toEqual(["Jazz Night"]);
+    });
+
+    it("matches against description, location, and category — not just title", async () => {
+        const { service } = buildService();
+        // Each event has exactly one field that matches a distinct query term.
+        // Titles are deliberately gibberish-free so they don't accidentally hit
+        // any search term we use below.
+        await createEventForTest(service, {
+            title: "Alpha",
+            description: "A cozy meetup for chess players",
+            location: "Community Center",
+            category: "general",
+        });
+        await createEventForTest(service, {
+            title: "Beta",
+            description: "Nothing special.",
+            location: "Main Library",
+            category: "general",
+        });
+        await createEventForTest(service, {
+            title: "Gamma",
+            description: "Nothing special.",
+            location: "Community Center",
+            category: "Music",
+        });
+        await createEventForTest(service, {
+            title: "Delta",
+            description: "Nothing special.",
+            location: "Community Center",
+            category: "general",
+        });
+
+        // Description-only match.
+        const chess = await service.searchEvents("chess");
+        expect(chess.ok).toBe(true);
+        if (!chess.ok) return;
+        expect(chess.value.map((e) => e.title)).toEqual(["Alpha"]);
+
+        // Location-only match.
+        const library = await service.searchEvents("library");
+        expect(library.ok).toBe(true);
+        if (!library.ok) return;
+        expect(library.value.map((e) => e.title)).toEqual(["Beta"]);
+
+        // Category-only match (also exercises case insensitivity vs. the
+        // capitalised "Music" category value).
+        const music = await service.searchEvents("music");
+        expect(music.ok).toBe(true);
+        if (!music.ok) return;
+        expect(music.value.map((e) => e.title)).toEqual(["Gamma"]);
+    });
+
+    it("excludes drafts, cancelled events, and past events even when they would match", async () => {
+        const { service } = buildService();
+        const pastStart = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+        const pastEnd = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+        await createEventForTest(service, { title: "Jazz Published", status: "PUBLISHED" });
+        await createEventForTest(service, { title: "Jazz Draft", status: "DRAFT" });
+        await createEventForTest(service, { title: "Jazz Cancelled", status: "CANCELLED" });
+        await createEventForTest(service, {
+            title: "Jazz Past",
+            status: "PUBLISHED",
+            startDatetime: pastStart,
+            endDatetime: pastEnd,
+        });
+
+        const result = await service.searchEvents("jazz");
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        // All four events have "Jazz" in the title — only the published,
+        // upcoming one is a legal search result.
+        expect(result.value.map((e) => e.title)).toEqual(["Jazz Published"]);
+    });
+});
+
+describe("EventService — search with no results", () => {
+    it("returns an empty array when no events match the query", async () => {
+        const { service } = buildService();
+        await createEventForTest(service, { title: "Jazz Night", status: "PUBLISHED" });
+        await createEventForTest(service, { title: "Book Club", status: "PUBLISHED" });
+
+        // "snowboarding" isn't in any field of any event (including the seed).
+        const result = await service.searchEvents("snowboarding");
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.value).toEqual([]);
+    });
+});
+
+describe("EventService — search with empty queries", () => {
+    it("returns all published upcoming events when query is an empty string", async () => {
+        const { service } = buildService();
+        await createEventForTest(service, { title: "Published A", status: "PUBLISHED" });
+        await createEventForTest(service, { title: "Published B", status: "PUBLISHED" });
+        await createEventForTest(service, { title: "Draft C", status: "DRAFT" });
+
+        const result = await service.searchEvents("");
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        // Use toContain / not.toContain so the seeded "Team Kickoff 2026" event
+        // (which is also published and upcoming) doesn't cause a length mismatch.
+        const titles = result.value.map((e) => e.title);
+        expect(titles).toContain("Published A");
+        expect(titles).toContain("Published B");
+        expect(titles).not.toContain("Draft C");
+    });
+
+    it("treats a whitespace-only query as empty (returns all published upcoming events)", async () => {
+        const { service } = buildService();
+        await createEventForTest(service, { title: "Published A", status: "PUBLISHED" });
+        await createEventForTest(service, { title: "Draft C", status: "DRAFT" });
+
+        const result = await service.searchEvents("   ");
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+
+        const titles = result.value.map((e) => e.title);
+        expect(titles).toContain("Published A");
+        expect(titles).not.toContain("Draft C");
+    });
+});
+
+describe("EventService — invalid search input", () => {
+    it("rejects queries longer than 200 characters with InvalidSearchQueryError", async () => {
+        const { service } = buildService();
+
+        const result = await service.searchEvents("a".repeat(201));
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.value.name).toBe("InvalidSearchQueryError");
+        }
+    });
+
+    it("rejects non-string runtime input with InvalidSearchQueryError", async () => {
+        const { service } = buildService();
+
+        // TypeScript's `string` type would normally block these calls, but the
+        // service guard is defense-in-depth for callers that bypass the type
+        // system (tests, JS interop, accidental any). Both should be rejected
+        // with the same error.
+        const nullResult = await service.searchEvents(null as unknown as string);
+        expect(nullResult.ok).toBe(false);
+        if (!nullResult.ok) {
+            expect(nullResult.value.name).toBe("InvalidSearchQueryError");
+        }
+
+        const objectResult = await service.searchEvents({ nope: true } as unknown as string);
+        expect(objectResult.ok).toBe(false);
+        if (!objectResult.ok) {
+            expect(objectResult.value.name).toBe("InvalidSearchQueryError");
+        }
+    });
+});
