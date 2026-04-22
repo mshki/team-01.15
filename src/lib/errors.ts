@@ -67,15 +67,15 @@ export const InvalidEventFilterError = (message: string): EventError => ({
 });
 
 export type RSVPError =
-  | { name: "InvalidRSVPTransitionError"; message: string }
-  | { name: "RSVPCapacityError"; message: string }
+  | { name: "UnauthorizedRSVPError"; message: string }
+  | { name: "InvalidRSVPError"; message: string }
 
-export const InvalidRSVPTransitionError = (message: string): RSVPError => ({
-  name: "InvalidRSVPTransitionError",
+export const UnauthorizedRSVPError = (message: string): RSVPError => ({
+  name: "UnauthorizedRSVPError",
   message,
 });
 
-export const RSVPCapacityError = (message: string): RSVPError => ({
-  name: "RSVPCapacityError",
+export const InvalidRSVPError = (message: string): RSVPError => ({
+  name: "InvalidRSVPError",
   message,
 });
