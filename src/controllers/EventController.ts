@@ -75,6 +75,7 @@ class EventController implements IEventController {
         if (error.name === "InvalidFieldError") return 400;
         if (error.name === "InvalidSearchQueryError") return 400;
         if (error.name === "InvalidEventFilterError") return 400;
+        if (error.name === "ForbiddenError" || error.name === "UnauthorizedEventActionError" || error.name === "UnauthorizedError") return 403;
         return 500;
 }
     
