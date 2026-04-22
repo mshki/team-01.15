@@ -1,6 +1,7 @@
 import { permission } from "node:process";
 import { AuthError, AuthorizationRequired } from "../auth/errors";
 import {
+    DatabaseError,
     EventError,
     EventNotFoundError,
     InvalidEventFilterError,
@@ -250,8 +251,7 @@ class EventService implements IEventService {
     async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, category: string, status: EventStatus, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
         const eventResult = await this.getEventEditForm(eventId, userId, userRole);
         if (!eventResult.ok) {
-            // TODO: verify error
-          return Err(ValidationError("Cannot edit event."));
+          return eventResult;
         }
 
         if (!title) {
@@ -292,8 +292,7 @@ class EventService implements IEventService {
         const isUpdated = await this.eventRepository.updateEvent(eventId, update);
 
         if (!isUpdated.ok) {
-            // Verify this is the correct error type
-            return Err(ValidationError("Failed to update event."))
+            return Err(DatabaseError("Failed to update event."))
         }
         return Ok(isUpdated.value);
     }
