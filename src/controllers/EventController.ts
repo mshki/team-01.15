@@ -363,9 +363,7 @@ class EventController implements IEventController {
 
         this.logger.info(`Event ${id} updated successfully. Redirecting...`);
       
-        res.setHeader("HX-Location", `/events/${id}`);
-
-        // TODO: is this the right HTTP code?
+        res.setHeader("HX-Redirect", '/events');
         res.status(200).send();
       }
 
