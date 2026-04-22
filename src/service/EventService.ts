@@ -6,6 +6,7 @@ import {
     InvalidEventFilterError,
     InvalidEventTransitionError,
     InvalidFieldError,
+    InvalidSearchQueryError,
     UnauthorizedEventActionError,
     UnknownError,
     ValidationError
@@ -538,9 +539,29 @@ class EventService implements IEventService {
     }
 
     async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+        // Validate input *before* normalizing so we can distinguish "user gave us
+        // something we refuse to accept" from "the input is just empty/whitespace."
+        //
+        // Two guards:
+        //   1. Runtime non-string defense. The signature is typed `string` and
+        //      the /events/search route already coerces req.query.q to a string,
+        //      but a direct service caller (tests, other code) could still pass
+        //      something else. Reject it explicitly rather than relying on the
+        //      caller to behave.
+        //   2. Length cap. 200 characters is well beyond any realistic search
+        //      intent and guards the server against trivially abusive inputs.
+        if (typeof query !== "string") {
+            return Err(InvalidSearchQueryError("Search query must be a string."));
+        }
+        if (query.length > 200) {
+            return Err(
+                InvalidSearchQueryError("Search query is too long (max 200 characters).")
+            );
+        }
+
         // Normalize once so every field comparison uses the same lowercased,
         // trimmed form and callers don't have to worry about whitespace or case.
-        const normalized = String(query ?? "").trim().toLowerCase();
+        const normalized = query.trim().toLowerCase();
         this.logger.info(`searchEvents called with query "${normalized}"`);
 
         const allEventsResult = await this.eventRepository.getAllEvents();

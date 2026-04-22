@@ -8,6 +8,7 @@ export type EventError =
     | { name: "UnauthorizedError"; message: string }
     | { name: "ForbiddenError"; message: string }
     | { name: "InvalidFieldError"; message: string }
+    | { name: "InvalidSearchQueryError"; message: string }
     | { name: "InvalidEventFilterError"; message: string };
 
 export const EventNotFoundError = (message: string): EventError => ({
@@ -52,6 +53,11 @@ export const ForbiddenError = (message: string): EventError => ({
 
 export const InvalidFieldError = (message: string): EventError => ({
     name: "InvalidFieldError",
+    message,
+});
+
+export const InvalidSearchQueryError = (message: string): EventError => ({
+    name: "InvalidSearchQueryError",
     message,
 });
 
