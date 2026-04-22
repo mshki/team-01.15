@@ -289,34 +289,6 @@ class EventController implements IEventController {
         session: IAppBrowserSession
       ): Promise<void> {
 
-        const currEvent = await this.eventService.getEventDetails(id);
-
-        if (!currEvent.ok && this.isEventError(currEvent.value)) {
-            const status = this.mapErrorStatus(currEvent.value);
-            const log = status === 400 ? this.logger.warn : this.logger.error;
-            log.call(this.logger, `Edit event failed: ${currEvent.value.message}`);
-            res.redirect('/events');
-            return;
-        } else if (!currEvent.ok) {
-            res.status(500).render("partials/error", {
-                message: "Unable to update event.",
-                layout: false,
-            });
-            return;
-        }
-
-        const currentUser = session.authenticatedUser;
-        const isAdmin = currentUser?.role === "admin";
-        const isOrganizer = currentUser?.userId === currEvent.value.organizerId;
-
-        if (!isAdmin && !isOrganizer) {
-            res.status(403).render("partials/error", {
-                message: "User does not have access to edit this event.",
-                layout: false,
-              });
-              return;
-        }
-
         this.logger.info(`Attempting to edit event ${id}...`);
 
         const result = await this.eventService.updateEvent(
@@ -368,8 +340,6 @@ class EventController implements IEventController {
         this.logger.info(`Event ${id} updated successfully. Redirecting...`);
       
         res.setHeader("HX-Location", `/events/${id}`);
-
-        // TODO: is this the right HTTP code?
         res.status(200).send();
       }
 
