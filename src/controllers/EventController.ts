@@ -500,19 +500,14 @@ class EventController implements IEventController {
             `Filtering events with timeframe "${timeframe}" and category "${category ?? "all"}"`
         );
 
-        const normalizedTimeframe =
-            timeframe === "all" || timeframe === "week" || timeframe === "weekend"
-                ? timeframe
-                : "all";
-
         const result = await this.eventService.filterPublishedEvents(
-            normalizedTimeframe,
+            timeframe,
             category
         );
 
         if (!result.ok && this.isEventError(result.value)) {
             const status = this.mapErrorStatus(result.value);
-            res.status(status).render("events/partials/error", {
+            res.status(status).render("partials/error", {
                 message: result.value.message,
                 layout: false,
             });
@@ -520,7 +515,7 @@ class EventController implements IEventController {
         }
 
         if (!result.ok) {
-            res.status(500).render("events/partials/error", {
+            res.status(500).render("partials/error", {
                 message: "Unable to filter events.",
                 layout: false,
             });
@@ -540,11 +535,11 @@ class EventController implements IEventController {
 
         res.render("events/index", {
             events: result.value,
-            timeframe: normalizedTimeframe,
+            timeframe,
             category,
             session,
             pageError: null,
-        });
+});
     }
 
     async searchEventsFromQuery(
