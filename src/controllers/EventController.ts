@@ -2,7 +2,7 @@ import type { Response } from "express";
 import { IEventService } from "../service/EventService";
 import { ILoggingService } from "../service/LoggingService";
 import { IAppBrowserSession, IAuthenticatedUserSession } from "../session/AppSession";
-import { EventError } from "../lib/errors";
+import { EventError, RSVPError } from "../lib/errors";
 import { IApp } from "../contracts";
 import { stat } from "node:fs";
 import { EventStatus } from "../types/EventTypes";
@@ -69,12 +69,23 @@ class EventController implements IEventController {
         );
     }
 
-    private mapErrorStatus(error: EventError): number {
+    private isRSVPError(value: unknown): value is RSVPError {
+        return (
+            typeof value === "object" &&
+            value !== null &&
+            "name" in value &&
+            "message" in value
+        );
+    }
+
+    private mapErrorStatus(error: EventError | RSVPError): number {
         if (error.name === "EventNotFoundError") return 404;
         if (error.name === "ValidationError") return 400;
         if (error.name === "InvalidFieldError") return 400;
         if (error.name === "InvalidSearchQueryError") return 400;
         if (error.name === "InvalidEventFilterError") return 400;
+        if (error.name === "InvalidRSVPError") return 404;
+        if (error.name === "UnauthorizedRSVPError") return 403;
         return 500;
 }
     
@@ -376,13 +387,21 @@ class EventController implements IEventController {
     async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
         const result = await this.eventService.toggleRsvp(eventId, user.userId, user.role);
 
-        if (!result.ok) {
-            const error = result.value as EventError;
+        if (!result.ok && (this.isEventError(result.value) || this.isRSVPError(result.value))) {
+            const error = result.value as EventError | RSVPError;
             const status = this.mapErrorStatus(error);
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Toggle RSVP failed: ${error.message}`);
-            res.status(status).render("events/partials/rsvp-error-response", {
-                message: error.message,
+            res.status(status).render("events/partials/rsvp-toggle-response", {
+                event: null,             
+                pageError: result.value.message,   
+                session,
+                layout: false,
+            });
+            return;
+        } else if (!result.ok) {
+            res.status(500).render("partials/error", {
+                message: "Unable to rsvp for event.",
                 layout: false,
             });
             return;
