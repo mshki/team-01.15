@@ -168,7 +168,7 @@ describe("event editing", () => {
         });
 
         expect(res.status).toBe(200);
-        expect(res.headers["hx-location"]).toBe(`/events/${event.id}`);
+        expect(res.headers["hx-redirect"]).toBe('/events');
     });
 
     it("return 400 upon invalid edit input", async () => {
