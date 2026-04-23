@@ -76,25 +76,52 @@ class EventService implements IEventService {
         return goingCount < event.capacity ? "GOING" : "WAITLISTED";
       }
       
+      /**
+       * Returns the waitlisted RSVPs for an event, ordered by join time (earliest first).
+       * This is the canonical ordering used for both queue position and promotion,
+       * so both operations agree on who is "next" in line.
+       */
+      private orderedWaitlist(event: IEvent): IRSVP[] {
+        return event.attendees
+          .filter((r) => r.rsvpStatus === "WAITLISTED")
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      }
+
+      /**
+       * Returns the 1-based position of `userId` in the event's waitlist,
+       * or null if that user is not currently waitlisted.
+       */
+      private calculateQueuePosition(event: IEvent, userId: string): number | null {
+        const waitlist = this.orderedWaitlist(event);
+        const idx = waitlist.findIndex((r) => r.userId === userId);
+        return idx === -1 ? null : idx + 1;
+      }
+
+      /**
+       * Promotes the earliest waitlisted RSVP to GOING if there is capacity.
+       * Mutates the passed event in-place; the caller is responsible for
+       * persisting the event in the same repository write so the cancel
+       * and promotion land atomically.
+       */
       private promoteWaitlistedIfPossible(event: IEvent): IRSVP | null {
         if (event.capacity === null) {
           return null;
         }
-      
+
         const goingCount = this.countGoing(event.attendees);
         if (goingCount >= event.capacity) {
           return null;
         }
-      
-        const waitlisted = event.attendees
-          .filter((r) => r.rsvpStatus === "WAITLISTED")
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
-      
+
+        const waitlisted = this.orderedWaitlist(event)[0];
         if (!waitlisted) {
           return null;
         }
-      
+
         waitlisted.rsvpStatus = "GOING";
+        this.logger.info(
+          `Promoted user ${waitlisted.userId} from waitlist to GOING on event ${event.id}`
+        );
         return waitlisted;
       }
 
@@ -338,6 +365,27 @@ class EventService implements IEventService {
 
         return Ok(saved.value);
     }
+
+    async getQueuePosition(
+        eventId: number,
+        userId: string
+    ): Promise<Result<number | null, EventError>> {
+        if (!eventId || eventId <= 0) {
+            return Err(ValidationError("Invalid event ID."));
+        }
+        if (!userId) {
+            return Err(ValidationError("User ID is required."));
+        }
+
+        const eventResult = await this.eventRepository.getEventById(eventId);
+        if (!eventResult.ok) {
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        }
+
+        const position = this.calculateQueuePosition(eventResult.value, userId);
+        return Ok(position);
+    }
+
     async publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>> {
         this.logger.info(`User ${userId} is publishing event ${eventId}`);
 
