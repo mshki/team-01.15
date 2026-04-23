@@ -4,22 +4,12 @@
     You are signed in and ready to build. This placeholder page is where your
     project's main content will go.
   </p>
-  <div class="flex gap-3 flex-wrap">
-    <a
-      href="/events"
-      class="inline-flex items-center px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium no-underline hover:bg-blue-700"
-    >
-      Browse Events
-    </a>
-    <% if (session.authenticatedUser && (session.authenticatedUser.role === 'staff' || session.authenticatedUser.role === 'admin')) { %>
-      <a
-        href="/events/new"
-        class="inline-flex items-center px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium no-underline hover:bg-green-700"
-      >
-        Create Event
-      </a>
-    <% } %>
-  </div>
+  <a
+    href="/events"
+    class="inline-flex items-center px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium no-underline hover:bg-blue-700"
+  >
+    Browse Events
+  </a>
   <% if (session.authenticatedUser) { %>
     <p class="text-slate-500 mt-2 mb-0">
       Signed in as <strong class="text-slate-700"><%= session.authenticatedUser.displayName %></strong>
