@@ -1,8 +1,15 @@
-export type EventError = 
+export type EventError =
     | { name: "EventNotFoundError"; message: string }
     | { name: "DatabaseError"; message: string }
     | { name: "ValidationError"; message: string }
-    | { name: "UnknownError"; message: string };
+    | { name: "UnknownError"; message: string }
+    | { name: "InvalidEventTransitionError"; message: string }
+    | { name: "UnauthorizedEventActionError"; message: string }
+    | { name: "UnauthorizedError"; message: string }
+    | { name: "ForbiddenError"; message: string }
+    | { name: "InvalidFieldError"; message: string }
+    | { name: "InvalidSearchQueryError"; message: string }
+    | { name: "InvalidEventFilterError"; message: string };
 
 export const EventNotFoundError = (message: string): EventError => ({
     name: "EventNotFoundError",
@@ -22,4 +29,53 @@ export const ValidationError = (message: string): EventError => ({
 export const UnknownError = (message: string): EventError => ({
     name: "UnknownError",
     message,
+});
+
+export const InvalidEventTransitionError = (message: string): EventError => ({
+    name: "InvalidEventTransitionError",
+    message,
+});
+
+export const UnauthorizedEventActionError = (message: string): EventError => ({
+    name: "UnauthorizedEventActionError",
+    message,
+});
+
+export const UnauthorizedError = (message: string): EventError => ({
+    name: "UnauthorizedError",
+    message,
+});
+
+export const ForbiddenError = (message: string): EventError => ({
+    name: "ForbiddenError",
+    message,
+});
+
+export const InvalidFieldError = (message: string): EventError => ({
+    name: "InvalidFieldError",
+    message,
+});
+
+export const InvalidSearchQueryError = (message: string): EventError => ({
+    name: "InvalidSearchQueryError",
+    message,
+});
+
+export const InvalidEventFilterError = (message: string): EventError => ({
+    name: "InvalidEventFilterError",
+    message,
+});
+
+export type RSVPError =
+  | { name: "UnauthorizedRSVPError"; message: string }
+  | { name: "InvalidRSVPError"; message: string }
+
+export const UnauthorizedRSVPError = (message: string): RSVPError => ({
+  name: "UnauthorizedRSVPError",
+  message,
+});
+
+export const InvalidRSVPError = (message: string): RSVPError => ({
+  name: "InvalidRSVPError",
+  message,
 });

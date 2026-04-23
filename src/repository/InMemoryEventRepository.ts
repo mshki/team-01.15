@@ -3,11 +3,23 @@ import { Err, Ok, type Result } from "../lib/result";
 import type { EventError } from "../lib/errors";
 import type { IEventRepository } from "./EventRepository";
 import { CreateEventData, Event, IRSVP, type IEvent } from "../types/EventTypes";
-import { ValidationError } from "../auth/errors";
 
 class InMemoryEventRepository implements IEventRepository {
-    private events = new Map<number, IEvent>();
-    private nextId = 1;
+    private events = new Map<number, IEvent>(
+        [new Event(1, {
+            title: "Team Kickoff 2026",
+            description: "Join us for the annual team kickoff to align on goals and celebrate the year ahead.",
+            location: "Main Conference Room",
+            category: "general",
+            capacity: 50,
+            status: "PUBLISHED",
+            organizerId: "user-admin",
+            startDatetime: new Date("2026-05-01T09:00:00"),
+            endDatetime: new Date("2026-05-01T11:00:00"),
+            attendees: [],
+        })].map(e => [e.id, e])
+    );
+    private nextId = 2;
 
     async getAllEvents(): Promise<Result<IEvent[], EventError>> {
         return Ok(Array.from(this.events.values()));
@@ -45,7 +57,7 @@ class InMemoryEventRepository implements IEventRepository {
         return Ok(undefined);
     }
 
-    async findUserRsvp(id: number, userId: string): Promise<Result<IRSVP, EventError>> {
+    async findUserRsvp(id: number, userId: string): Promise<Result<IRSVP | null, EventError>> {
         const event = this.events.get(id);
         if (!event) {
             return Err(EventNotFoundError(`Event with id ${id} not found`));
@@ -56,8 +68,7 @@ class InMemoryEventRepository implements IEventRepository {
         );
       
         if (!rsvp) {
-            // TODO: fix error logic
-            return Err(EventNotFoundError("TODO"));
+            return Ok(null);
         }
       
         return Ok({

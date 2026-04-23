@@ -1,10 +1,24 @@
 import { permission } from "node:process";
 import { AuthError, AuthorizationRequired } from "../auth/errors";
-import { EventError, EventNotFoundError, UnknownError, ValidationError } from "../lib/errors";
+import {
+    DatabaseError,
+    EventError,
+    EventNotFoundError,
+    InvalidEventFilterError,
+    InvalidEventTransitionError,
+    InvalidFieldError,
+    InvalidRSVPError,
+    InvalidSearchQueryError,
+    RSVPError,
+    UnauthorizedEventActionError,
+    UnauthorizedRSVPError,
+    UnknownError,
+    ValidationError
+} from "../lib/errors";
 import { IAuthenticatedUserSession } from "../session/AppSession";
 import { Err, Ok, Result } from "../lib/result";
 import { IEventRepository } from "../repository/EventRepository";
-import { CreateEventData, IEvent, IRSVP, RSVPStatus } from "../types/EventTypes";
+import { CreateEventData, EventStatus, IEvent, IRSVP, RSVPStatus } from "../types/EventTypes";
 import { ILoggingService } from "./LoggingService";
 import { UserRole } from "../auth/User";
 
@@ -13,96 +27,41 @@ import { UserRole } from "../auth/User";
 export interface IEventService {
     createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
-    getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError | AuthError>>;
+    getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError>>;
     updateEvent(eventId: number, 
         userId: string,
         userRole: string,
         title: string,
         description: string,
         location: string,
+        category: string,
+        status: EventStatus,
         startDatetime: Date,
         endDatetime: Date,
         capacity: number): Promise<Result<IEvent, EventError>>;
-    toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError>>;
+    toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError | RSVPError>>;
     publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>>;
     cancelEvent(eventId: number, userId: string, isAdmin: boolean): Promise<Result<IEvent, EventError>>;
     filterPublishedEvents(timeframe?: string, category?: string | null): Promise<Result<IEvent[], EventError>>;
+    /**
+     * Searches published upcoming events whose title, description, location, or
+     * category contains `query` as a case-insensitive substring.
+     *
+     * An empty or whitespace-only query is treated as "no filter" and returns
+     * every published event whose endDatetime is in the future. This mirrors
+     * Sprint 1's spec: empty query returns all published upcoming events.
+     */
+    searchEvents(query: string): Promise<Result<IEvent[], EventError>>;
+    /**
+     * Returns the 1-based position of the given user in the waitlist for the event,
+     * or null if the user is not currently waitlisted. Position is ordered by
+     * createdAt (earliest join is #1).
+     */
+    getQueuePosition(eventId: number, userId: string): Promise<Result<number | null, EventError>>;
 }
 
 class EventService implements IEventService {
     constructor(private readonly eventRepository: IEventRepository, private readonly logger: ILoggingService) {}
-
-    private canEditEvent(event: IEvent, userId: string, userRole: string): Result<null, EventError | AuthError> {
-        const isAdmin = userRole=== "admin";
-        const isOwner = event.organizerId === userId;
-    
-        if (userRole === "user" && !isOwner) {
-            return Err(AuthorizationRequired("Only owner can edit events."));
-        }
-    
-        if (!isAdmin && !isOwner) {
-            return Err(AuthorizationRequired("Need permission to edit this event."));
-        }
-    
-        const now = new Date();
-        if (event.status === "CANCELLED" || event.status === "CONCLUDED") {
-            return Err(ValidationError("Cancelled or concluded events cannot be edited."));
-        }
-    
-        if (event.endDatetime.getTime() < now.getTime()) {
-            return Err(ValidationError("Past events cannot be edited."));
-        }
-    
-        return Ok(null);
-    }
-    // async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
-    //     this.logger.info(`searchEvents called with query: "${query}"`);
-
-    //     const result = await this.eventRepository.searchEvents(query);
-
-    //     if (!result.ok) {
-    //         this.logger.warn(`searchEvents failed: ${result.error.message}`);
-    //         return result;
-    //     }
-
-    //     this.logger.info(`searchEvents returned ${result.value.length} results`);
-    //     return result;
-    // }
-
-
-    private canRsvp(event: IEvent, userId: string, userRole: UserRole): Result<void, EventError> {
-        if (userRole === "admin") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Only members can RSVP to events."));
-        }
-
-        if (event.organizerId === userId) {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Organizers cannot RSVP to their own events."));
-        }
-
-        if (event.status === "CANCELLED") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Cancelled events cannot receive RSVPs."));
-        }
-
-        if (event.status === "CONCLUDED") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Concluded events cannot receive RSVPs."));
-        }
-    
-        if (event.status !== "PUBLISHED") {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Only published events can receive RSVPs."));
-        }
-
-        if (new Date(event.endDatetime).getTime() <= new Date().getTime()) {
-            // TODO: rsvp error logic
-            return Err(UnknownError("Past events cannot receive RSVPs."));
-        }
-    
-        return Ok(undefined);
-    }
 
     private countGoing(attendees: IRSVP[]): number {
         return attendees.filter((r) => r.rsvpStatus === "GOING").length;
@@ -117,25 +76,52 @@ class EventService implements IEventService {
         return goingCount < event.capacity ? "GOING" : "WAITLISTED";
       }
       
+      /**
+       * Returns the waitlisted RSVPs for an event, ordered by join time (earliest first).
+       * This is the canonical ordering used for both queue position and promotion,
+       * so both operations agree on who is "next" in line.
+       */
+      private orderedWaitlist(event: IEvent): IRSVP[] {
+        return event.attendees
+          .filter((r) => r.rsvpStatus === "WAITLISTED")
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      }
+
+      /**
+       * Returns the 1-based position of `userId` in the event's waitlist,
+       * or null if that user is not currently waitlisted.
+       */
+      private calculateQueuePosition(event: IEvent, userId: string): number | null {
+        const waitlist = this.orderedWaitlist(event);
+        const idx = waitlist.findIndex((r) => r.userId === userId);
+        return idx === -1 ? null : idx + 1;
+      }
+
+      /**
+       * Promotes the earliest waitlisted RSVP to GOING if there is capacity.
+       * Mutates the passed event in-place; the caller is responsible for
+       * persisting the event in the same repository write so the cancel
+       * and promotion land atomically.
+       */
       private promoteWaitlistedIfPossible(event: IEvent): IRSVP | null {
         if (event.capacity === null) {
           return null;
         }
-      
+
         const goingCount = this.countGoing(event.attendees);
         if (goingCount >= event.capacity) {
           return null;
         }
-      
-        const waitlisted = event.attendees
-          .filter((r) => r.rsvpStatus === "WAITLISTED")
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
-      
+
+        const waitlisted = this.orderedWaitlist(event)[0];
         if (!waitlisted) {
           return null;
         }
-      
+
         waitlisted.rsvpStatus = "GOING";
+        this.logger.info(
+          `Promoted user ${waitlisted.userId} from waitlist to GOING on event ${event.id}`
+        );
         return waitlisted;
       }
 
@@ -144,35 +130,36 @@ class EventService implements IEventService {
         const title = String(eventData.title ?? "").trim();
         const description = String(eventData.description ?? "").trim();
         const location = String(eventData.location ?? "").trim();
-        const { organizerId, startDatetime, endDatetime, capacity, status, attendees } = eventData;
+        const { organizerId, startDatetime, endDatetime, capacity, status, attendees, category } = eventData;
 
         if (!title) {
-            return Err(ValidationError("Title is required."));
+            return Err(InvalidFieldError("Title is required."));
         }
         if (title.length < 3) {
-            return Err(ValidationError("Title must be at least 3 characters."));
+            return Err(InvalidFieldError("Title must be at least 3 characters."));
         }
         if (!description) {
-            return Err(ValidationError("Description is required."));
+            return Err(InvalidFieldError("Description is required."));
         }
         if (!location) {
-            return Err(ValidationError("Location is required."));
+            return Err(InvalidFieldError("Location is required."));
         }
         if (!organizerId) {
-            return Err(ValidationError("Organizer is required."));
+            return Err(InvalidFieldError("Organizer is required."));
         }
         if (!startDatetime || !endDatetime) {
-            return Err(ValidationError("Start and end datetime are required."));
+            return Err(InvalidFieldError("Start and end datetime are required."));
         }
         if (endDatetime <= startDatetime) {
-            return Err(ValidationError("End datetime must be after start datetime."));
+            return Err(InvalidFieldError("End datetime must be after start datetime."));
         }
         if (capacity != null && capacity < 1) {
-            return Err(ValidationError("Capacity must be at least 1."));
+            return Err(InvalidFieldError("Capacity must be at least 1."));
         }
 
         // 2. Call repository to create event
-        const result = await this.eventRepository.createEvent({ title, description, location, organizerId, startDatetime, endDatetime, capacity, status, attendees });
+        const result = await this.eventRepository.createEvent({ title: title, description: description, location: location, category: category, organizerId: organizerId, startDatetime: startDatetime, endDatetime: endDatetime, capacity: capacity, status: status, attendees: attendees,
+});
         this.logger.info(`Attempted to create event with title "${title}". Result: ${result.ok ? "Success" : "Error"}`);
 
         // 3. Handle repository result and return appropriate response
@@ -203,24 +190,37 @@ class EventService implements IEventService {
         return Ok(result.value);
     }
 
-    async getEventEditForm(eventId: number, userId: string, userRole: string): Promise<Result<IEvent, EventError | AuthError>> {
-        const event = await this.eventRepository.getEventById(eventId);
+    async getEventEditForm(eventId: number, userId: string, userRole: string): Promise<Result<IEvent, EventError>> {
+        const eventResponse = await this.eventRepository.getEventById(eventId);
 
-        if (event.ok) {
-            const permissionCheck = this.canEditEvent(event.value, userId, userRole);
-            if (permissionCheck.ok) {
-                return Ok(event.value);
-            } else return permissionCheck;
-        } else {
+        if (!eventResponse.ok) {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         }
+
+        const event = eventResponse.value;
+        const isAdmin = userRole=== "admin";
+        const isOwner = event.organizerId === userId;
+    
+        if (!isAdmin && !isOwner) {
+            return Err(UnauthorizedEventActionError("Need permission to edit this event."));
+        }
+    
+        const now = new Date();
+        if (event.status === "CANCELLED" || event.status === "CONCLUDED") {
+            return Err(ValidationError("Cancelled or concluded events cannot be edited."));
+        }
+    
+        if (event.endDatetime.getTime() < now.getTime()) {
+            return Err(ValidationError("Past events cannot be edited."));
+        }
+
+        return Ok(event);
     }
 
-    async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
+    async updateEvent(eventId: number, userId: string, userRole: string, title: string, description: string, location: string, category: string, status: EventStatus, startDatetime: Date, endDatetime: Date, capacity: number): Promise<Result<IEvent, EventError>> {
         const eventResult = await this.getEventEditForm(eventId, userId, userRole);
         if (!eventResult.ok) {
-            // TODO: verify error
-          return Err(ValidationError("Cannot edit event."));
+          return eventResult;
         }
 
         if (!title) {
@@ -251,40 +251,61 @@ class EventService implements IEventService {
             title: title.trim(),
             description: description.trim(),
             location: location.trim(),
-            startDatetime: startDatetime!,
-            endDatetime: endDatetime!,
+            category: category.trim(),
+            status: status,
+            startDatetime: new Date(startDatetime),
+            endDatetime: new Date(endDatetime),
             capacity: capacity,
             updatedAt: new Date(),
           };
         const isUpdated = await this.eventRepository.updateEvent(eventId, update);
-        if (!isUpdated) {
-          return Err(EventNotFoundError("Event not found."));
-        } 
 
         if (!isUpdated.ok) {
-            // Verify this is the correct error type
-            return Err(ValidationError("Failed to update event."))
+            return Err(DatabaseError("Failed to update event."))
         }
         return Ok(isUpdated.value);
     }
 
-    async toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError>> {
+    async toggleRsvp(eventId: number, userId: string, userRole: UserRole): Promise<Result<IEvent, EventError | RSVPError>> {
         const getEvent = await this.eventRepository.getEventById(eventId);
         if (!getEvent.ok) {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         }
         const event = getEvent.value
-        const now = new Date();
       
-        const allowed = this.canRsvp(event, userId, userRole);
-        if (!allowed.ok) {
-            // TODO: rsvp error logic
-            return Err(UnknownError("TODO"));
+        if (userRole === "admin") {
+            return Err(UnauthorizedRSVPError("Only members can RSVP to events."));
+        }
+        
+        if (event.organizerId === userId) {
+            return Err(UnauthorizedRSVPError("Organizers cannot RSVP to their own events."));
+        }
+        if (event.status === "CANCELLED") {
+            return Err(InvalidRSVPError("Cancelled events cannot receive RSVPs."));
+        }
+
+        if (event.status === "CONCLUDED") {
+            return Err(InvalidRSVPError("Concluded events cannot receive RSVPs."));
+        }
+    
+        if (event.status !== "PUBLISHED") {
+            return Err(InvalidRSVPError("Only published events can receive RSVPs."));
+        }
+
+        if (new Date(event.endDatetime).getTime() <= new Date().getTime()) {
+            return Err(InvalidRSVPError("Past events cannot receive RSVPs."));
         }
       
         const existing = await this.eventRepository.findUserRsvp(eventId, userId);
         let updatedRsvp: IRSVP;
         if (!existing.ok) {
+            // TODO: inspect logic, this is really repetitive right now, but I can't think of
+                // a much better way to do this right now
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        } 
+
+        if (!existing.value) {
+            // the case of null return from service
             const status = this.nextJoinStatus(event);
       
             updatedRsvp = {
@@ -344,6 +365,27 @@ class EventService implements IEventService {
 
         return Ok(saved.value);
     }
+
+    async getQueuePosition(
+        eventId: number,
+        userId: string
+    ): Promise<Result<number | null, EventError>> {
+        if (!eventId || eventId <= 0) {
+            return Err(ValidationError("Invalid event ID."));
+        }
+        if (!userId) {
+            return Err(ValidationError("User ID is required."));
+        }
+
+        const eventResult = await this.eventRepository.getEventById(eventId);
+        if (!eventResult.ok) {
+            return Err(EventNotFoundError(`Event ${eventId} not found.`));
+        }
+
+        const position = this.calculateQueuePosition(eventResult.value, userId);
+        return Ok(position);
+    }
+
     async publishEvent(eventId: number, userId: string): Promise<Result<IEvent, EventError>> {
         this.logger.info(`User ${userId} is publishing event ${eventId}`);
 
@@ -357,12 +399,12 @@ class EventService implements IEventService {
 
         if (event.organizerId !== userId) {
             this.logger.info(`Publish denied for user ${userId} on event ${eventId}: not organizer`);
-            return Err(ValidationError("Only the organizer can publish this event"));
-        }
+            return Err(UnauthorizedEventActionError("Only the organizer can publish this event"));
+        } 
 
         if (event.status !== "DRAFT") {
             this.logger.info(`Publish denied for event ${eventId}: status is ${event.status}`);
-            return Err(ValidationError("Only draft events can be published"));
+            return Err(InvalidEventTransitionError("Only draft events can be published"));
         }
 
         const updatedResult = await this.eventRepository.updateEvent(eventId, {
@@ -395,12 +437,12 @@ class EventService implements IEventService {
 
         if (!isOrganizer && !isAdmin) {
             this.logger.info(`Cancel denied for user ${userId} on event ${eventId}: not organizer or admin`);
-            return Err(ValidationError("Only the organizer or an admin can cancel this event"));
+            return Err(UnauthorizedEventActionError("Only the organizer or an admin can cancel this event"));
         }
 
         if (event.status !== "PUBLISHED") {
             this.logger.info(`Cancel denied for event ${eventId}: status is ${event.status}`);
-            return Err(ValidationError("Only published events can be cancelled"));
+            return Err(InvalidEventTransitionError("Only published events can be cancelled"));
         }
 
         const updatedResult = await this.eventRepository.updateEvent(eventId, {
@@ -438,8 +480,10 @@ class EventService implements IEventService {
         );
 
         if (category && category.trim() !== "") {
+            const normalizedCategory = category.trim().toLowerCase();
+
             filteredEvents = filteredEvents.filter(
-                (event) => (event.category ?? "").toLowerCase() === category.toLowerCase()
+                (event) => (event.category ?? "").trim().toLowerCase() === normalizedCategory
             );
         }
 
@@ -472,8 +516,73 @@ class EventService implements IEventService {
             );
         }
 
-        return Err(ValidationError("Invalid timeframe filter"));
+        return Err(InvalidEventFilterError("Invalid timeframe filter"));
     }
+
+    async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+        // Validate input *before* normalizing so we can distinguish "user gave us
+        // something we refuse to accept" from "the input is just empty/whitespace."
+        //
+        // Two guards:
+        //   1. Runtime non-string defense. The signature is typed `string` and
+        //      the /events/search route already coerces req.query.q to a string,
+        //      but a direct service caller (tests, other code) could still pass
+        //      something else. Reject it explicitly rather than relying on the
+        //      caller to behave.
+        //   2. Length cap. 200 characters is well beyond any realistic search
+        //      intent and guards the server against trivially abusive inputs.
+        if (typeof query !== "string") {
+            return Err(InvalidSearchQueryError("Search query must be a string."));
+        }
+        if (query.length > 200) {
+            return Err(
+                InvalidSearchQueryError("Search query is too long (max 200 characters).")
+            );
+        }
+
+        // Normalize once so every field comparison uses the same lowercased,
+        // trimmed form and callers don't have to worry about whitespace or case.
+        const normalized = query.trim().toLowerCase();
+        this.logger.info(`searchEvents called with query "${normalized}"`);
+
+        const allEventsResult = await this.eventRepository.getAllEvents();
+        if (!allEventsResult.ok) {
+            return allEventsResult;
+        }
+
+        // Apply the "published + upcoming" predicate first — same rule as
+        // filterPublishedEvents uses. Search results should never expose drafts,
+        // cancelled events, or events that have already ended.
+        const now = new Date();
+        const publishedUpcoming = allEventsResult.value.filter(
+            (event) =>
+                event.status === "PUBLISHED" &&
+                event.endDatetime.getTime() >= now.getTime()
+        );
+
+        // Spec: empty query returns all published upcoming events.
+        if (normalized === "") {
+            return Ok(publishedUpcoming);
+        }
+
+        // Spec: match against multiple fields. Case-insensitive substring match
+        // on any of title, description, location, or category is enough to
+        // include the event.
+        const matches = publishedUpcoming.filter((event) => {
+            const haystacks = [
+                event.title,
+                event.description,
+                event.location,
+                event.category ?? "",
+            ];
+            return haystacks.some((field) =>
+                field.toLowerCase().includes(normalized)
+            );
+        });
+
+        return Ok(matches);
+    }
+
     private getUpcomingWeekendRange(now: Date): { start: Date; end: Date } {
         const day = now.getDay(); // 0=Sun ... 6=Sat
         const daysUntilSaturday = day === 6 ? 0 : (6 - day + 7) % 7;
