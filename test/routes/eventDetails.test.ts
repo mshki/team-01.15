@@ -1,6 +1,5 @@
 import request from "supertest";
 import { createComposedApp } from "../../src/composition";
-import { createEventController } from "../../src/controllers/EventController";
 import { createEventService } from "../../src/service/EventService";
 import { createInMemoryEventRepository } from "../../src/repository/InMemoryEventRepository";
 import type { ILoggingService } from "../../src/service/LoggingService";
@@ -15,8 +14,7 @@ const silentLogger: ILoggingService = {
 function buildApp() {
     const repo = createInMemoryEventRepository();
     const eventService = createEventService(repo, silentLogger);
-    const controller = createEventController(eventService, silentLogger);
-    const app = createComposedApp(controller, silentLogger);
+    const app = createComposedApp(silentLogger, repo);
     return { expressApp: app.getExpressApp(), eventService };
 }
 
@@ -134,8 +132,7 @@ describe("GET /events/:id — cancelled and concluded events", () => {
         // CONCLUDED by updating the underlying record.
         const repo = createInMemoryEventRepository();
         const service2 = createEventService(repo, silentLogger);
-        const controller2 = createEventController(service2, silentLogger);
-        const app2 = createComposedApp(controller2, silentLogger).getExpressApp();
+        const app2 = createComposedApp(silentLogger, repo).getExpressApp();
 
         const event2 = await createEvent(service2, { status: "PUBLISHED" });
         // Conclude by patching status directly through a second createEvent is not
