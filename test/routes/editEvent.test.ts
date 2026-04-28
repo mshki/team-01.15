@@ -1,6 +1,5 @@
 import request from "supertest";
 import { createComposedApp } from "../../src/composition";
-import { createEventController } from "../../src/controllers/EventController";
 import { createEventService } from "../../src/service/EventService";
 import { createInMemoryEventRepository } from "../../src/repository/InMemoryEventRepository";
 import type { ILoggingService } from "../../src/service/LoggingService";
@@ -16,8 +15,7 @@ const silentLogger: ILoggingService = {
 function buildApp() {
     const repo = createInMemoryEventRepository();
     const eventService = createEventService(repo, silentLogger);
-    const controller = createEventController(eventService, silentLogger);
-    const app = createComposedApp(controller, silentLogger);
+    const app = createComposedApp(silentLogger);
     return { expressApp: app.getExpressApp(), eventService };
 }
 
