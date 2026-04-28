@@ -10,18 +10,19 @@ import type { ILoggingService } from "./service/LoggingService";
 import { createInMemoryEventRepository } from "./repository/InMemoryEventRepository";
 import { createEventController } from "./controllers/EventController";
 import { createEventService } from "./service/EventService";
+import type { IEventRepository } from "./repository/EventRepository";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { createPrismaRepository } from "./repository/PrismaRepository";
 
 
-export function createComposedApp(logger?: ILoggingService): IApp {
+export function createComposedApp(logger?: ILoggingService, repoOverride?: IEventRepository): IApp {
   const resolvedLogger = logger ?? CreateLoggingService();
 
-  let eventRepo = createInMemoryEventRepository();
+  let eventRepo: IEventRepository = repoOverride ?? createInMemoryEventRepository();
 
-  if (process.env.REPO_MODE === "prisma") {
+  if (!repoOverride && process.env.REPO_MODE === "prisma") {
     const rawUrl = process.env.DATABASE_URL!;
     const dbPath = path.resolve(rawUrl.replace(/^file:/, ""));
     const adapter = new PrismaBetterSqlite3({ url: dbPath });
