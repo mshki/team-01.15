@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "sqlite"
 }
+
 enum EventStatus {
   DRAFT
   PUBLISHED
@@ -13,51 +14,41 @@ enum EventStatus {
 }
 
 enum RSVPStatus {
-  YES
-  NO
-  WAITLIST
+  GOING
+  WAITLISTED
+  CANCELLED
 }
 
 model User {
-  id        String          @id @default(uuid())
-  email     String          @unique
-  attendees EventAttendee[]
+  id        String   @id
+  email     String   @unique
+  attendees RSVP[]
+  events    Event[]  @relation("OrganizerEvents")
 }
 
 model Event {
-  id          Int             @id @default(autoincrement())
-  title       String
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  attendees   EventAttendee[]
-  eventDesc   EventDesc?
+  id            Int         @id @default(autoincrement())
+  title         String
+  description   String
+  location      String
+  category      String?
+  capacity      Int?
+  status        EventStatus
+  startDatetime DateTime
+  endDatetime   DateTime
+  organizerId   String
+  organizer     User        @relation("OrganizerEvents", fields: [organizerId], references: [id])
+  attendees     RSVP[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
-model EventDesc {
-  id        Int         @id @default(autoincrement())
-  eventId   Int         @unique
-  title     String
-  desc      String
-  location  String
-  category  String
-  datetime  DateTime
-  organizer String
-  capacity  Int
-  status    EventStatus @default(DRAFT)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventAttendee {
-  eventId   Int
-  userId    String
-  rsvp      RSVPStatus @default(WAITLIST)
-  createdAt DateTime   @default(now())
-
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@id([eventId, userId])
-  @@unique([eventId, userId])
+model RSVP {
+  id         String     @id
+  eventId    Int
+  userId     String
+  rsvpStatus RSVPStatus
+  createdAt  DateTime   @default(now())
+  event      Event      @relation(fields: [eventId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
 }
