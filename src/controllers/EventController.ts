@@ -425,7 +425,7 @@ class EventController implements IEventController {
             layout: false,
         });
     }
-        async cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+    async cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
         const userId = session.authenticatedUser?.userId;
         const isAdmin = session.authenticatedUser?.role === "admin";
 
@@ -451,6 +451,17 @@ class EventController implements IEventController {
                 },
                 session,
                 pageError: error.message,
+                layout: false,
+            });
+            return;
+        }
+
+        const isHtmx = res.req.get("HX-Request") === "true";
+
+        if (isHtmx) {
+            res.render("events/partials/event-card", {
+                event: result.value,
+                session,
                 layout: false,
             });
             return;
