@@ -46,7 +46,7 @@ const canRsvp = !isAdmin && !isOrganizer && event.status === 'PUBLISHED';
           action="/events/<%= event.id %>/cancel"
           hx-post="/events/<%= event.id %>/cancel"
           hx-target="closest article"
-          hx-swap="outerHTML"
+          hx-swap="delete"
         >
           <button
             type="submit"
