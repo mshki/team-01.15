@@ -640,10 +640,18 @@ class EventController implements IEventController {
             currentUser.role
         );
 
-        if (!result.ok) {
+        if (!result.ok && this.isEventError(result.value)) {
             const status = this.mapErrorStatus(result.value);
             res.status(status).render("partials/error", {
                 message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("partials/error", {
+                message: "Unable to delete draft event.",
                 layout: false,
             });
             return;
