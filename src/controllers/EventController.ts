@@ -55,6 +55,7 @@ export interface IEventController {
         query: string,
         session: IAppBrowserSession
     ): Promise<void>;
+    showDraftEvents(res: Response, session: IAppBrowserSession): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -409,6 +410,13 @@ class EventController implements IEventController {
             return;
         }
 
+        const isHtmx = res.req.get("HX-Request") === "true";
+
+        if (isHtmx) {
+            res.status(200).send();
+            return;
+        }
+
         res.render("events/partials/lifecycle-controls", {
             event: result.value,
             session,
@@ -559,6 +567,53 @@ class EventController implements IEventController {
         res.render("events/search", {
             events: result.value,
             query,
+            session,
+            pageError: null,
+        });
+    }
+    async showDraftEvents(res: Response, session: IAppBrowserSession): Promise<void> {
+        const currentUser = session.authenticatedUser;
+
+        if (!currentUser) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
+                layout: false,
+            });
+            return;
+        }
+
+        if (currentUser.role === "user") {
+            res.status(403).render("partials/error", {
+                message: "Only staff and admins can view draft events.",
+                layout: false,
+            });
+            return;
+        }
+
+        const result = await this.eventService.getDraftEventsForUser(
+            currentUser.userId,
+            currentUser.role
+        );
+
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            res.status(status).render("partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("partials/error", {
+                message: "Unable to load draft events.",
+                layout: false,
+            });
+            return;
+        }
+
+        res.render("events/drafts", {
+            events: result.value,
             session,
             pageError: null,
         });

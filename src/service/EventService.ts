@@ -58,6 +58,7 @@ export interface IEventService {
      * createdAt (earliest join is #1).
      */
     getQueuePosition(eventId: number, userId: string): Promise<Result<number | null, EventError>>;
+    getDraftEventsForUser(userId: string, userRole: string): Promise<Result<IEvent[], EventError>>;
 }
 
 class EventService implements IEventService {
@@ -596,6 +597,32 @@ class EventService implements IEventService {
         sundayEnd.setHours(23, 59, 59, 999);
 
         return { start: saturday, end: sundayEnd };
+    }
+    async getDraftEventsForUser(
+        userId: string,
+        userRole: string
+    ): Promise<Result<IEvent[], EventError>> {
+        this.logger.info(`Fetching draft events for user ${userId} with role ${userRole}`);
+
+        const allEventsResult = await this.eventRepository.getAllEvents();
+
+        if (!allEventsResult.ok) {
+            return allEventsResult;
+        }
+
+        const drafts = allEventsResult.value.filter((event) => {
+            if (event.status !== "DRAFT") {
+                return false;
+            }
+
+            if (userRole === "admin") {
+                return true;
+            }
+
+            return event.organizerId === userId;
+        });
+
+        return Ok(drafts);
     }
 
 
