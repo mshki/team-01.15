@@ -634,7 +634,7 @@ class EventService implements IEventService {
 
         const eventResult = await this.eventRepository.getEventById(eventId);
         if (!eventResult.ok) {
-            return Err(eventResult.value);
+            return Err(eventResult.value as EventError);
         }
 
         const event = eventResult.value;
