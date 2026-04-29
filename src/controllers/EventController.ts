@@ -407,13 +407,6 @@ class EventController implements IEventController {
             return;
         }
 
-        const isHtmx = res.req.get("HX-Request") === "true";
-
-        if (isHtmx) {
-            res.status(200).send();
-            return;
-        }
-
         res.render("events/partials/lifecycle-controls", {
             event: result.value,
             session,
