@@ -55,12 +55,28 @@
             hx-post="/events/<%= event.id %>/publish"
             hx-target="closest article"
             hx-swap="delete"
-            >
+          >
             <button
               type="submit"
               class="w-full px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 cursor-pointer text-sm"
             >
               Publish
+            </button>
+          </form>
+
+          <form
+            method="post"
+            action="/events/<%= event.id %>/delete"
+            hx-post="/events/<%= event.id %>/delete"
+            hx-target="closest article"
+            hx-swap="delete"
+          >
+            <button
+              type="submit"
+              class="w-full px-4 py-2.5 rounded-lg bg-white text-red-700 border border-red-300 font-medium hover:bg-red-50 cursor-pointer text-sm"
+              onclick="return confirm('Delete this draft? This cannot be undone.')"
+            >
+              Delete Draft
             </button>
           </form>
         </div>

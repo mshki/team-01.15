@@ -56,6 +56,7 @@ export interface IEventController {
         session: IAppBrowserSession
     ): Promise<void>;
     showDraftEvents(res: Response, session: IAppBrowserSession): Promise<void>;
+    deleteDraftFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -414,7 +415,7 @@ class EventController implements IEventController {
             layout: false,
         });
     }
-        async cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+    async cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
         const userId = session.authenticatedUser?.userId;
         const isAdmin = session.authenticatedUser?.role === "admin";
 
@@ -442,6 +443,13 @@ class EventController implements IEventController {
                 pageError: error.message,
                 layout: false,
             });
+            return;
+        }
+
+        const isHtmx = res.req.get("HX-Request") === "true";
+
+        if (isHtmx) {
+            res.status(200).send();
             return;
         }
 
@@ -607,6 +615,52 @@ class EventController implements IEventController {
             session,
             pageError: null,
         });
+    }
+    async deleteDraftFromForm(
+        res: Response,
+        eventId: number,
+        session: IAppBrowserSession
+    ): Promise<void> {
+        const currentUser = session.authenticatedUser;
+
+        if (!currentUser) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
+                layout: false,
+            });
+            return;
+        }
+
+        const result = await this.eventService.deleteDraftEvent(
+            eventId,
+            currentUser.userId,
+            currentUser.role
+        );
+
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            res.status(status).render("partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("partials/error", {
+                message: "Unable to delete draft event.",
+                layout: false,
+            });
+            return;
+        }
+
+        const isHtmx = res.req.get("HX-Request") === "true";
+        if (isHtmx) {
+            res.status(200).send();
+            return;
+        }
+
+        res.redirect("/events/drafts");
     }
 }
 

@@ -59,6 +59,7 @@ export interface IEventService {
      */
     getQueuePosition(eventId: number, userId: string): Promise<Result<number | null, EventError>>;
     getDraftEventsForUser(userId: string, userRole: string): Promise<Result<IEvent[], EventError>>;
+    deleteDraftEvent(eventId: number, userId: string, userRole: string): Promise<Result<void, EventError>>;
 }
 
 class EventService implements IEventService {
@@ -549,6 +550,32 @@ class EventService implements IEventService {
         });
 
         return Ok(drafts);
+    }
+    async deleteDraftEvent(
+        eventId: number,
+        userId: string,
+        userRole: string
+    ): Promise<Result<void, EventError>> {
+        this.logger.info(`User ${userId} is deleting draft event ${eventId}`);
+
+        const eventResult = await this.eventRepository.getEventById(eventId);
+        if (!eventResult.ok) {
+            return Err(eventResult.value as EventError);
+        }
+
+        const event = eventResult.value;
+        const isAdmin = userRole === "admin";
+        const isOrganizer = event.organizerId === userId;
+
+        if (!isAdmin && !isOrganizer) {
+            return Err(UnauthorizedEventActionError("Only the organizer or an admin can delete this draft event"));
+        }
+
+        if (event.status !== "DRAFT") {
+            return Err(InvalidEventTransitionError("Only draft events can be deleted"));
+        }
+
+        return await this.eventRepository.deleteEvent(eventId);
     }
 
 
