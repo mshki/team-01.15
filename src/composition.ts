@@ -17,20 +17,25 @@ import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { createPrismaRepository } from "./repository/PrismaRepository";
 
 
-export function createComposedApp(mode: "memory" | "prisma", logger?: ILoggingService): IApp {
+export function createComposedApp(mode: "memory" | "prisma" | "test_prisma", logger?: ILoggingService): IApp {
   const resolvedLogger = logger ?? CreateLoggingService();
 
   // TODO: should we rename createPrismaRepository to createPrismaEventRepository
+  const dbUrl =
+    mode === "test_prisma"
+      ? process.env.TEST_DB_URL!.replace(/^file:/, "")
+      : process.env.DATABASE_URL!.replace(/^file:/, "");
+
   const eventRepo =
-    mode === "prisma"
-      ? createPrismaRepository(
+    mode === "memory"
+      ? createInMemoryEventRepository()
+      : createPrismaRepository(
           new PrismaClient({
             adapter: new PrismaBetterSqlite3({
-              url: path.resolve(process.env.DATABASE_URL!.replace(/^file:/, ""))
+              url: path.resolve(dbUrl),
             }),
           }),
-        )
-      : createInMemoryEventRepository();
+        );
 
   const authUsers = CreateInMemoryUserRepository();
   const passwordHasher = CreatePasswordHasher();
