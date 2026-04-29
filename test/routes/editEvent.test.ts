@@ -3,7 +3,6 @@ import { createComposedApp } from "../../src/composition";
 import type { ILoggingService } from "../../src/service/LoggingService";
 import { CreateEventData } from "../../src/types/EventTypes";
 
-// Reused from eventDetails.test.ts
 const silentLogger: ILoggingService = {
     info: () => {},
     warn: () => {},
@@ -51,9 +50,7 @@ async function createEvent(
     expect(response.status).toBe(302);
   }
 
-// End reused
-
-describe("event editing", () => {
+describe("memory repo tests event editing", () => {
     it("returns the edit form for organizer", async () => {
         const app = buildApp("memory");
         const agent = request.agent(app);
