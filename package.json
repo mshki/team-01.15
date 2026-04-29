@@ -9,7 +9,7 @@
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev --name init && node scripts/setup-test-db.cjs",
+    "prisma:migrate": "prisma migrate dev --name init && node scripts/setup-data-db.cjs && node scripts/setup-test-db.cjs",
     "db:setup-test": "node scripts/setup-test-db.cjs",
     "clean": "rimraf dist node_modules"
   },
