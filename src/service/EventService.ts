@@ -25,7 +25,7 @@ import { UserRole } from "../auth/User";
 
 
 export interface IEventService {
-    createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
+    createEvent(session: IAuthenticatedUserSession, eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
     getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError>>;
     updateEvent(eventId: number, 
@@ -127,7 +127,13 @@ class EventService implements IEventService {
         return waitlisted;
       }
 
-    async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
+    async createEvent(session: IAuthenticatedUserSession, eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
+        // Only staff or higher can create events
+        if (session.role == "user") {
+            this.logger.warn(`User ${session.userId} with role "user" attempted to create event.`);
+            return Err(UnauthorizedEventActionError("Only staff or higher can create events."));
+        }
+        
         // 1. Validate input data
         const title = String(eventData.title ?? "").trim();
         const description = String(eventData.description ?? "").trim();
@@ -306,51 +312,21 @@ class EventService implements IEventService {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         } 
 
-        if (!existing.value) {
-            // the case of null return from service
+        if (!existing.value || existing.value.rsvpStatus === "CANCELLED") {
             const status = this.nextJoinStatus(event);
       
-            updatedRsvp = {
-                id: `rsvp_${eventId}_${userId}_${Date.now().toString(36)}`,
-                eventId,
-                userId,
-                rsvpStatus: status,
-                createdAt: new Date(),
-            };
-      
-            event.attendees.push(updatedRsvp);
-        } else if (existing.value.rsvpStatus === "CANCELLED") {
-            const status = this.nextJoinStatus(event);
-            updatedRsvp = {
-                ...existing.value,
-                rsvpStatus: status,
-            };
-
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
-            );
-
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
-            } else {
-                event.attendees.push(updatedRsvp);
+            const res = await this.eventRepository.saveRsvp(eventId, userId, status);
+            if (!res.ok) {
+                return Err(DatabaseError(`Update RSVP to event ${eventId} for user ${userId} failed.`))
             }
         } else {
             const wasGoing = existing.value.rsvpStatus === "GOING";
 
-            updatedRsvp = {
-                ...existing.value,
-                rsvpStatus: "CANCELLED",
-            };
+            const status: RSVPStatus = "CANCELLED"; 
 
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
-            );
-
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
-            } else {
-                event.attendees.push(updatedRsvp);
+            const res = await this.eventRepository.saveRsvp(eventId, userId, status);
+            if (!res.ok) {
+                return Err(DatabaseError(`Update RSVP to event ${eventId} for user ${userId} failed.`))
             }
 
             if (wasGoing) {
