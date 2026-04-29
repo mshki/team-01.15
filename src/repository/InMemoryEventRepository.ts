@@ -1,4 +1,4 @@
-import { EventNotFoundError, DatabaseError } from "../lib/errors";
+import { EventNotFoundError, DatabaseError, ValidationError } from "../lib/errors";
 import { Err, Ok, type Result } from "../lib/result";
 import type { EventError } from "../lib/errors";
 import type { IEventRepository } from "./EventRepository";
@@ -100,11 +100,84 @@ class InMemoryEventRepository implements IEventRepository {
                 rsvpStatus: status,
                 createdAt: new Date(),
             };
-            
+
             event.attendees.push(newRsvp);
         }
-    
+
         return Ok(undefined);
+    }
+
+    /**
+     * Atomically cancels the user's RSVP and, if a seat opened up, promotes
+     * the earliest WAITLISTED RSVP to GOING. The in-memory implementation is
+     * naturally atomic: both attendee mutations happen on the same event
+     * object before the method returns, so no partial state is observable
+     * to other callers between the two writes.
+     */
+    async cancelRsvpWithPromotion(
+        eventId: number,
+        userId: string
+    ): Promise<Result<IEvent, EventError>> {
+        const event = this.events.get(eventId);
+        if (!event) {
+            return Err(EventNotFoundError(`Event with id ${eventId} not found`));
+        }
+
+        const rsvpIdx = event.attendees.findIndex(
+            (r) => r.eventId === eventId && r.userId === userId
+        );
+        if (rsvpIdx === -1) {
+            return Err(
+                ValidationError(`No RSVP found for user ${userId} on event ${eventId}`)
+            );
+        }
+
+        const existing = event.attendees[rsvpIdx];
+        if (existing.rsvpStatus === "CANCELLED") {
+            return Err(
+                ValidationError(
+                    `RSVP for user ${userId} on event ${eventId} is already cancelled`
+                )
+            );
+        }
+
+        const wasGoing = existing.rsvpStatus === "GOING";
+
+        // Step 1: cancel the user's RSVP
+        event.attendees[rsvpIdx] = {
+            ...existing,
+            rsvpStatus: "CANCELLED",
+        };
+
+        // Step 2: if cancellation freed a seat, promote the earliest waitlisted RSVP.
+        // Only relevant when the user was GOING (cancelling a WAITLISTED RSVP doesn't
+        // free a seat) and the event has a finite capacity.
+        if (wasGoing && event.capacity != null) {
+            const goingCount = event.attendees.filter(
+                (r) => r.rsvpStatus === "GOING"
+            ).length;
+            if (goingCount < event.capacity) {
+                const earliestWaitlisted = event.attendees
+                    .filter((r) => r.rsvpStatus === "WAITLISTED")
+                    .sort(
+                        (a, b) =>
+                            new Date(a.createdAt).getTime() -
+                            new Date(b.createdAt).getTime()
+                    )[0];
+                if (earliestWaitlisted) {
+                    const wIdx = event.attendees.findIndex(
+                        (r) => r.id === earliestWaitlisted.id
+                    );
+                    event.attendees[wIdx] = {
+                        ...earliestWaitlisted,
+                        rsvpStatus: "GOING",
+                    };
+                }
+            }
+        }
+
+        event.updatedAt = new Date();
+        return Ok(event);
     }
 }
 

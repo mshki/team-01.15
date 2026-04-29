@@ -98,34 +98,6 @@ class EventService implements IEventService {
         return idx === -1 ? null : idx + 1;
       }
 
-      /**
-       * Promotes the earliest waitlisted RSVP to GOING if there is capacity.
-       * Mutates the passed event in-place; the caller is responsible for
-       * persisting the event in the same repository write so the cancel
-       * and promotion land atomically.
-       */
-      private promoteWaitlistedIfPossible(event: IEvent): IRSVP | null {
-        if (event.capacity === null) {
-          return null;
-        }
-
-        const goingCount = this.countGoing(event.attendees);
-        if (goingCount >= event.capacity) {
-          return null;
-        }
-
-        const waitlisted = this.orderedWaitlist(event)[0];
-        if (!waitlisted) {
-          return null;
-        }
-
-        waitlisted.rsvpStatus = "GOING";
-        this.logger.info(
-          `Promoted user ${waitlisted.userId} from waitlist to GOING on event ${event.id}`
-        );
-        return waitlisted;
-      }
-
     async createEvent(session: IAuthenticatedUserSession, eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
         // Only staff or higher can create events
         if (session.role == "user") {
@@ -319,18 +291,24 @@ class EventService implements IEventService {
                 return Err(DatabaseError(`Update RSVP to event ${eventId} for user ${userId} failed.`))
             }
         } else {
-            const wasGoing = existing.value.rsvpStatus === "GOING";
-
-            const status: RSVPStatus = "CANCELLED"; 
-
-            const res = await this.eventRepository.saveRsvp(eventId, userId, status);
-            if (!res.ok) {
-                return Err(DatabaseError(`Update RSVP to event ${eventId} for user ${userId} failed.`))
+            // Cancel branch: delegate to the repository's atomic cancel + promote.
+            // The repo method wraps the RSVP cancel and the (possibly empty) waitlist
+            // promotion in one transaction (Prisma) or one synchronous mutation
+            // (InMemory), so we never end up with the cancel persisted but the
+            // promotion lost. It returns the refreshed event with up-to-date
+            // attendees, which is exactly what callers expect.
+            const cancelled = await this.eventRepository.cancelRsvpWithPromotion(
+                eventId,
+                userId
+            );
+            if (!cancelled.ok) {
+                return Err(
+                    DatabaseError(
+                        `Cancel RSVP to event ${eventId} for user ${userId} failed.`
+                    )
+                );
             }
-
-            if (wasGoing) {
-                this.promoteWaitlistedIfPossible(event);
-            }
+            return Ok(cancelled.value);
         }
 
         event.updatedAt = new Date();
