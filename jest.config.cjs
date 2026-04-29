@@ -10,4 +10,5 @@ module.exports = {
   },
   clearMocks: true,
   collectCoverageFrom: ['src/**/*.ts'],
+  setupFiles: ['<rootDir>/test/jest.setup.cjs'],
 }
