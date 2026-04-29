@@ -179,6 +179,45 @@ class InMemoryEventRepository implements IEventRepository {
         event.updatedAt = new Date();
         return Ok(event);
     }
+
+    /**
+     * In-memory mirror of the Prisma-backed search. Filters the event map
+     * down to PUBLISHED events whose endDatetime is in the future, then
+     * (if `query` is non-empty) keeps only those whose title, description,
+     * location, or category contains `query` as a case-insensitive
+     * substring.
+     *
+     * `query` is expected to already be trimmed + lowercased by the
+     * service layer, so we lowercase each haystack field and use plain
+     * `includes`. This stays symmetric with how the Prisma side relies on
+     * SQLite's case-insensitive LIKE for ASCII characters.
+     */
+    async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
+        const now = new Date();
+        const publishedUpcoming = Array.from(this.events.values()).filter(
+            (event) =>
+                event.status === "PUBLISHED" &&
+                event.endDatetime.getTime() >= now.getTime()
+        );
+
+        if (query === "") {
+            return Ok(publishedUpcoming);
+        }
+
+        const matches = publishedUpcoming.filter((event) => {
+            const haystacks = [
+                event.title,
+                event.description,
+                event.location,
+                event.category ?? "",
+            ];
+            return haystacks.some((field) =>
+                field.toLowerCase().includes(query)
+            );
+        });
+
+        return Ok(matches);
+    }
 }
 
 export function createInMemoryEventRepository(): IEventRepository {

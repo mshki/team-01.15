@@ -29,4 +29,19 @@ export interface IEventRepository {
         eventId: number,
         userId: string
     ): Promise<Result<IEvent, EventError>>;
+    /**
+     * Returns published, upcoming events whose title, description, location,
+     * or category contains `query` as a case-insensitive substring.
+     *
+     * `query` is expected to already be trimmed + lowercased by the service
+     * layer; the repository simply forwards it to the storage filter. An
+     * empty string means "no text filter" — return every published event
+     * whose endDatetime is in the future.
+     *
+     * Pushing this filter into the repository (rather than fetching every
+     * event and filtering in JS at the service layer) lets the Prisma
+     * implementation translate it into a single SQL query with `LIKE`
+     * predicates, which scales with the table instead of with the heap.
+     */
+    searchEvents(query: string): Promise<Result<IEvent[], EventError>>;
 }
