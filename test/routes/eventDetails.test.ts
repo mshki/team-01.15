@@ -1,4 +1,6 @@
 import request from "supertest";
+import BetterSqlite3 from "better-sqlite3";
+import path from "node:path";
 import { createComposedApp } from "../../src/composition";
 import { createEventService } from "../../src/service/EventService";
 import { createInMemoryEventRepository } from "../../src/repository/InMemoryEventRepository";
@@ -77,10 +79,19 @@ async function createEventViaHttp(
 // ── Tests that run in both memory and prisma modes ───────────────────────────
 // These tests set up state through HTTP only (no direct service/repo access).
 
-describe.each([["memory"], ["prisma"]] as const)("GET /events/:id (%s mode)", (mode) => {
+describe.each([["memory"], ["test_prisma"]] as const)("GET /events/:id (%s mode)", (mode) => {
     function buildApp() {
         return createComposedApp(mode, silentLogger).getExpressApp();
     }
+
+    afterEach(() => {
+        if (mode === "test_prisma") {
+            const db = new BetterSqlite3(path.resolve(process.env.TEST_DB_URL!.replace(/^file:/, "")));
+            db.prepare("DELETE FROM RSVP").run();
+            db.prepare("DELETE FROM Event").run();
+            db.close();
+        }
+    });
 
     describe("published events", () => {
         it("returns 200 for an anonymous user viewing a published event", async () => {
@@ -354,14 +365,6 @@ describe.each([["memory"], ["prisma"]] as const)("GET /events/:id (%s mode)", (m
         });
     });
 
-    describe("seeded demo event (ID 1)", () => {
-        it("returns 200 for the pre-seeded published event", async () => {
-            const agent = request.agent(buildApp());
-            const res = await agent.get("/events/1");
-            expect(res.status).toBe(200);
-            expect(res.text).toContain("Team Kickoff 2026");
-        });
-    });
 });
 
 // ── Tests that only run in memory mode (require direct service access) ────────
@@ -470,5 +473,13 @@ describe("GET /events/:id — memory-only tests", () => {
         const agent = request.agent(expressApp);
         const res = await agent.get(`/events/${concludedEvent.id}`);
         expect(res.status).toBe(200);
+    });
+
+    it("returns 200 for the pre-seeded published event (ID 1)", async () => {
+        const app = createComposedApp("memory", silentLogger).getExpressApp();
+        const agent = request.agent(app);
+        const res = await agent.get("/events/1");
+        expect(res.status).toBe(200);
+        expect(res.text).toContain("Team Kickoff 2026");
     });
 });
