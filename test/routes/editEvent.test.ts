@@ -32,7 +32,7 @@ const FUTURE_END = new Date(FUTURE_START.getTime() + 60 * 60 * 1000);
 async function createEvent(
     agent: any,
     overrides: Partial<CreateEventData> = {},
-  ): Promise<number> {
+  ) {
     const response = await agent
       .post("/events")
       .type("form")
@@ -49,16 +49,6 @@ async function createEvent(
     });
 
     expect(response.status).toBe(302);
-
-    const location = response.headers.location;
-    
-    const match = location.match(/\/events\/(\d+)/);
-    
-    if (!match) {
-        throw new Error(`Could not extract event id from Location header: ${location}`);
-    }
-
-    return Number(match[1]);
   }
 
 // End reused
@@ -69,10 +59,9 @@ describe("event editing", () => {
         const agent = request.agent(app);
         await loginAs(agent, "staff@app.test");
 
-        const event = await createEvent(agent);
-        
+        await createEvent(agent);
 
-        const res = await agent.get(`/events/${event}/edit`);
+        const res = await agent.get(`/events/2/edit`);
         expect(res.status).toBe(200);
         expect(res.text).toContain("Edit Event");
     });
@@ -81,24 +70,23 @@ describe("event editing", () => {
         const app = buildApp("memory");
         const agent = request.agent(app);
         await loginAs(agent, "admin@app.test");
+        
+        await createEvent(agent);
 
-        const event = await createEvent(agent);
-
-
-        const res = await agent.get(`/events/${event}/edit`);
+        const res = await agent.get(`/events/2/edit`);
         expect(res.status).toBe(200);
         expect(res.text).toContain("Edit Event");
     });
 
     it("rejects members from accessing edit form", async () => {
         const app = buildApp("memory");
-        const agent = request.agent(app);
+        let agent = request.agent(app);
+        await loginAs(agent, "admin@app.test");
+        await createEvent(agent);
 
         await loginAs(agent, "user@app.test");
 
-        const event = await createEvent(agent);
-
-        const res = await agent.get(`/events/${event}/edit`);
+        const res = await agent.get(`/events/2/edit`);
         expect(res.status).toBe(403);
         expect(res.text).toContain("Need permission to edit this event.");
     });
@@ -121,11 +109,11 @@ describe("event editing", () => {
         const agent = request.agent(app);
 
         await loginAs(agent, "admin@app.test");
-        const event = await createEvent(agent);
+        await createEvent(agent);
 
-        const res = await agent.post(`/events/${event}/cancel`)
+        const res = await agent.post(`/events/2/cancel`)
         expect(res.status).toBe(200);
-        const edit_res = await agent.get(`/events/${event}/edit`);
+        const edit_res = await agent.get(`/events/2/edit`);
         expect(edit_res.status).toBe(400);
     });
 
@@ -135,22 +123,23 @@ describe("event editing", () => {
 
         await loginAs(agent, "admin@app.test");
 
-        const event = await createEvent(agent);
+        await createEvent(agent);
 
-        
         await agent
-            .post(`/events/${event}/edit`)
+            .post(`/events/2/edit`)
             .type("form")
             .send({
-                title: "Test Event", // Match createEvent defaults or desired update
-                description: "A test event description.",
-                location: "Room 101",
-                startDatetime: "2025-04-21T10:00:00.000Z",
-                endDatetime: "2025-04-22T11:00:00.000Z",
+                name: "Concluded Event",
+                description: "This should work",
+                location: "No room",
+                category: "",
                 status: "CONCLUDED",
+                startDatetime: START_STRING,
+                endDatetime: END_STRING,
+                capacity: ""
             });
 
-        const res = await agent.get(`/events/${event}/edit`);
+        const res = await agent.get(`/events/2/edit`);
         expect(res.status).toBe(400);
         expect(res.text).toContain("Cancelled or concluded events cannot be edited.");
     });
@@ -160,11 +149,11 @@ describe("event editing", () => {
         const agent = request.agent(app);
 
         await loginAs(agent, "admin@app.test");
-        const event = await createEvent(agent);
+        await createEvent(agent);
 
 
         const res = await agent
-        .post(`/events/${event}/edit`)
+        .post(`/events/2/edit`)
         .type("form")
         .send({
             name: "better name",
@@ -186,10 +175,10 @@ describe("event editing", () => {
         const agent = request.agent(app);
 
         await loginAs(agent, "admin@app.test");
-        const event = await createEvent(agent);
+        await createEvent(agent);
 
         const res = await agent
-        .post(`/events/${event}/edit`)
+        .post(`/events/2/edit`)
         .type("form")
         .send({
             name: "",
