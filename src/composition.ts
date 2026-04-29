@@ -10,6 +10,7 @@ import type { ILoggingService } from "./service/LoggingService";
 import { createInMemoryEventRepository } from "./repository/InMemoryEventRepository";
 import { createEventController } from "./controllers/EventController";
 import { createEventService } from "./service/EventService";
+import type { IEventRepository } from "./repository/EventRepository";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client/index";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
