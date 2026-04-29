@@ -25,7 +25,7 @@ import { UserRole } from "../auth/User";
 
 
 export interface IEventService {
-    createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
+    createEvent(session: IAuthenticatedUserSession, eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
     getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError>>;
     updateEvent(eventId: number, 
@@ -126,7 +126,13 @@ class EventService implements IEventService {
         return waitlisted;
       }
 
-    async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
+    async createEvent(session: IAuthenticatedUserSession, eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
+        // Only staff or higher can create events
+        if (session.role == "user") {
+            this.logger.warn(`User ${session.userId} with role "user" attempted to create event.`);
+            return Err(UnauthorizedEventActionError("Only staff or higher can create events."));
+        }
+        
         // 1. Validate input data
         const title = String(eventData.title ?? "").trim();
         const description = String(eventData.description ?? "").trim();

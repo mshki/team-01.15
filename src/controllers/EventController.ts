@@ -114,14 +114,7 @@ class EventController implements IEventController {
             res.status(401);
             return;
         }
-
-        // Only staff or higher can create events
-        if (session.authenticatedUser.role == "user") {
-            this.logger.warn(`User ${session.authenticatedUser.userId} with role "user" attempted to create event.`);
-            res.status(403).end();
-            return;
-        }
-
+        
         // 1. Construct createEventData
         const data = {
             title: name,
@@ -137,7 +130,7 @@ class EventController implements IEventController {
         };
 
         // 2. Call service to create event
-        const result = await this.eventService.createEvent(data);
+        const result = await this.eventService.createEvent(session.authenticatedUser, data);
 
         this.logger.info(`Attempted to create event with name "${name}". Result: ${result.ok ? "Success" : "Error"}`);
 

@@ -42,7 +42,7 @@ export class HttpServer implements IServer {
 }
 
 const logger = CreateLoggingService();
-const mode: "memory" | "prisma" = (process.env.REPO_MODE as "memory" | "prisma") || "memory";
+const mode: "memory" | "prisma" | "test_prisma" = (process.env.REPO_MODE as "memory" | "prisma" | "test_prisma") || "memory";
 const port = Number(process.env.HTTPS_PORT ?? process.env.PORT ?? 3443);
 const app = createComposedApp(mode, logger);
 const server = new HttpServer(app);
