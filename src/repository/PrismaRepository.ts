@@ -1,8 +1,21 @@
 import { PrismaClient, RSVPStatus } from "@prisma/client";
 import type { IEventRepository } from "./EventRepository";
-import { DatabaseError, EventNotFoundError } from "../lib/errors";
+import { DatabaseError, EventNotFoundError, ValidationError } from "../lib/errors";
+import type { EventError } from "../lib/errors";
 import { Ok, Err } from "../lib/result";
 import type { CreateEventData, IEvent, IRSVP } from "../types/EventTypes";
+
+/**
+ * Sentinel error thrown inside a $transaction callback to abort the
+ * transaction with a typed EventError. Throwing inside the callback causes
+ * Prisma to roll back any writes already issued in the same transaction,
+ * which is exactly what we want for the cancel + promote pair.
+ */
+class AbortTx extends Error {
+    constructor(public readonly eventError: EventError) {
+        super(eventError.message);
+    }
+}
 
 const include = { attendees: true } as const;
 
@@ -137,6 +150,99 @@ class PrismaRepository implements IEventRepository {
           } catch (e) {
                 return Err(DatabaseError(String(e)));
           }
+    }
+
+    /**
+     * Atomically cancels a user's RSVP and promotes the earliest WAITLISTED
+     * attendee if a seat opened up. Both writes happen inside one
+     * `prisma.$transaction(...)`, so either both commit or both roll back.
+     *
+     * The transaction also re-reads the event at the end so the returned
+     * snapshot reflects the post-write state without a second round trip.
+     * If anything throws inside the callback (including our AbortTx), Prisma
+     * rolls back every write issued in the same transaction.
+     */
+    async cancelRsvpWithPromotion(eventId: number, userId: string) {
+        try {
+            const updated = await this.client.$transaction(async (tx) => {
+                // 1. Load the event with current attendees inside the transaction.
+                //    Reading inside the tx (rather than relying on a prior fetch)
+                //    keeps the decision about who to promote consistent with the
+                //    state we actually write against.
+                const event = await tx.event.findUnique({
+                    where: { id: eventId },
+                    include,
+                });
+                if (!event) {
+                    throw new AbortTx(
+                        EventNotFoundError(`Event ${eventId} not found`)
+                    );
+                }
+
+                // 2. Find the user's RSVP. Refuse if missing or already cancelled.
+                const existing = event.attendees.find((r) => r.userId === userId);
+                if (!existing) {
+                    throw new AbortTx(
+                        ValidationError(
+                            `No RSVP found for user ${userId} on event ${eventId}`
+                        )
+                    );
+                }
+                if (existing.rsvpStatus === "CANCELLED") {
+                    throw new AbortTx(
+                        ValidationError(
+                            `RSVP for user ${userId} on event ${eventId} is already cancelled`
+                        )
+                    );
+                }
+
+                const wasGoing = existing.rsvpStatus === "GOING";
+
+                // 3. Cancel the user's RSVP.
+                await tx.rSVP.update({
+                    where: { id: existing.id },
+                    data: { rsvpStatus: "CANCELLED" },
+                });
+
+                // 4. Promote the earliest WAITLISTED RSVP if a seat opened up.
+                //    Cancelling a WAITLISTED RSVP doesn't free a seat, so this
+                //    branch is gated on the cancelled RSVP having been GOING.
+                //    `event.capacity != null` covers both null and undefined.
+                if (wasGoing && event.capacity != null) {
+                    const goingCount = event.attendees.filter(
+                        (r) => r.rsvpStatus === "GOING" && r.id !== existing.id
+                    ).length;
+                    if (goingCount < event.capacity) {
+                        const earliestWaitlisted = event.attendees
+                            .filter((r) => r.rsvpStatus === "WAITLISTED")
+                            .sort(
+                                (a, b) =>
+                                    new Date(a.createdAt).getTime() -
+                                    new Date(b.createdAt).getTime()
+                            )[0];
+                        if (earliestWaitlisted) {
+                            await tx.rSVP.update({
+                                where: { id: earliestWaitlisted.id },
+                                data: { rsvpStatus: "GOING" },
+                            });
+                        }
+                    }
+                }
+
+                // 5. Re-read the event so the returned snapshot reflects the
+                //    new attendee statuses without a second round trip.
+                const refreshed = await tx.event.findUnique({
+                    where: { id: eventId },
+                    include,
+                });
+                return refreshed!;
+            });
+
+            return Ok(toIEvent(updated));
+        } catch (e) {
+            if (e instanceof AbortTx) return Err(e.eventError);
+            return Err(DatabaseError(String(e)));
+        }
     }
 }
 
