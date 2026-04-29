@@ -311,51 +311,21 @@ class EventService implements IEventService {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         } 
 
-        if (!existing.value) {
-            // the case of null return from service
+        if (!existing.value || existing.value.rsvpStatus === "CANCELLED") {
             const status = this.nextJoinStatus(event);
       
-            updatedRsvp = {
-                id: `rsvp_${eventId}_${userId}_${Date.now().toString(36)}`,
-                eventId,
-                userId,
-                rsvpStatus: status,
-                createdAt: new Date(),
-            };
-      
-            event.attendees.push(updatedRsvp);
-        } else if (existing.value.rsvpStatus === "CANCELLED") {
-            const status = this.nextJoinStatus(event);
-            updatedRsvp = {
-                ...existing.value,
-                rsvpStatus: status,
-            };
-
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
-            );
-
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
-            } else {
-                event.attendees.push(updatedRsvp);
+            const res = await this.eventRepository.saveRsvp(eventId, userId, status);
+            if (!res.ok) {
+                return Err(DatabaseError(`Update RSVP to event ${eventId} for user ${userId} failed.`))
             }
         } else {
             const wasGoing = existing.value.rsvpStatus === "GOING";
 
-            updatedRsvp = {
-                ...existing.value,
-                rsvpStatus: "CANCELLED",
-            };
+            const status: RSVPStatus = "CANCELLED"; 
 
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
-            );
-
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
-            } else {
-                event.attendees.push(updatedRsvp);
+            const res = await this.eventRepository.saveRsvp(eventId, userId, status);
+            if (!res.ok) {
+                return Err(DatabaseError(`Update RSVP to event ${eventId} for user ${userId} failed.`))
             }
 
             if (wasGoing) {
