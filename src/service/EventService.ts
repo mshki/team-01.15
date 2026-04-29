@@ -495,47 +495,19 @@ class EventService implements IEventService {
             );
         }
 
-        // Normalize once so every field comparison uses the same lowercased,
-        // trimmed form and callers don't have to worry about whitespace or case.
+        // Normalize once so the storage layer gets a single, predictable form.
+        // The repository contract treats `query` as already trimmed + lowercased
+        // and as already meaning "no text filter" when empty. This service
+        // method owns the validation; the repo owns the filter.
         const normalized = query.trim().toLowerCase();
         this.logger.info(`searchEvents called with query "${normalized}"`);
 
-        const allEventsResult = await this.eventRepository.getAllEvents();
-        if (!allEventsResult.ok) {
-            return allEventsResult;
-        }
-
-        // Apply the "published + upcoming" predicate first — same rule as
-        // filterPublishedEvents uses. Search results should never expose drafts,
-        // cancelled events, or events that have already ended.
-        const now = new Date();
-        const publishedUpcoming = allEventsResult.value.filter(
-            (event) =>
-                event.status === "PUBLISHED" &&
-                event.endDatetime.getTime() >= now.getTime()
-        );
-
-        // Spec: empty query returns all published upcoming events.
-        if (normalized === "") {
-            return Ok(publishedUpcoming);
-        }
-
-        // Spec: match against multiple fields. Case-insensitive substring match
-        // on any of title, description, location, or category is enough to
-        // include the event.
-        const matches = publishedUpcoming.filter((event) => {
-            const haystacks = [
-                event.title,
-                event.description,
-                event.location,
-                event.category ?? "",
-            ];
-            return haystacks.some((field) =>
-                field.toLowerCase().includes(normalized)
-            );
-        });
-
-        return Ok(matches);
+        // Push the filter into the repository. The Prisma implementation
+        // turns this into a single SQL query (status + endDatetime + OR of
+        // contains across the four fields); the in-memory implementation
+        // mirrors the same logic on the event map. Either way, we no
+        // longer pull every event into the service to filter in JS.
+        return this.eventRepository.searchEvents(normalized);
     }
 
     private getUpcomingWeekendRange(now: Date): { start: Date; end: Date } {

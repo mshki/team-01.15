@@ -153,6 +153,44 @@ class PrismaRepository implements IEventRepository {
     }
 
     /**
+     * Pushes the search filter into the database instead of fetching every
+     * event and filtering in JS at the service layer. The where-clause is
+     * a single SQL query: status = PUBLISHED, endDatetime >= now, and an
+     * OR across the four searchable fields when `query` is non-empty.
+     *
+     * `query` is expected to already be trimmed + lowercased by the
+     * service. We pass it straight to `contains`, which Prisma compiles to
+     * SQL `LIKE`. SQLite's `LIKE` is case-insensitive for ASCII by
+     * default, which is what gets us the case-insensitivity for free —
+     * Prisma's `mode: "insensitive"` filter is Postgres/Mongo only and
+     * isn't available here.
+     *
+     * An empty query means "no text filter": just return every published
+     * event whose endDatetime is in the future.
+     */
+    async searchEvents(query: string) {
+        try {
+            const now = new Date();
+            const where: any = {
+                status: "PUBLISHED",
+                endDatetime: { gte: now },
+            };
+            if (query !== "") {
+                where.OR = [
+                    { title: { contains: query } },
+                    { description: { contains: query } },
+                    { location: { contains: query } },
+                    { category: { contains: query } },
+                ];
+            }
+            const events = await this.client.event.findMany({ where, include });
+            return Ok(events.map(toIEvent));
+        } catch (e) {
+            return Err(DatabaseError(String(e)));
+        }
+    }
+
+    /**
      * Atomically cancels a user's RSVP and promotes the earliest WAITLISTED
      * attendee if a seat opened up. Both writes happen inside one
      * `prisma.$transaction(...)`, so either both commit or both roll back.
