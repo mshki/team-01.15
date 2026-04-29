@@ -9,7 +9,7 @@ const silentLogger: ILoggingService = {
     error: () => {},
 };
 
-function buildApp(mode: "memory" | "prisma") {
+function buildApp(mode: "memory" | "prisma" | "test_prisma") {
     const app = createComposedApp(mode, silentLogger);
     return app.getExpressApp();
 }
