@@ -1,4 +1,6 @@
 import request from "supertest";
+import BetterSqlite3 from "better-sqlite3";
+import path from "node:path";
 import { createComposedApp } from "../../src/composition";
 import type { ILoggingService } from "../../src/service/LoggingService";
 
@@ -8,7 +10,7 @@ const silentLogger: ILoggingService = {
     error: () => {},
 };
 
-function buildApp(mode: "memory" | "prisma") {
+function buildApp(mode: "memory" | "test_prisma") {
     return createComposedApp(mode, silentLogger).getExpressApp();
 }
 
@@ -40,7 +42,16 @@ function validBody(overrides: Record<string, string> = {}) {
     };
 }
 
-describe.each([["memory"], ["prisma"]] as const)("createEvent tests (%s mode)", (mode) => {
+describe.each([["memory"], ["test_prisma"]] as const)("createEvent tests (%s mode)", (mode) => {
+    afterEach(() => {
+        if (mode === "test_prisma") {
+            const db = new BetterSqlite3(path.resolve(process.env.TEST_DB_URL!.replace(/^file:/, "")));
+            db.prepare("DELETE FROM RSVP").run();
+            db.prepare("DELETE FROM Event").run();
+            db.close();
+        }
+    });
+
     // ── GET /events/new ──────────────────────────────────────────────────────────
 
     describe("GET /events/new — showEventForm", () => {
