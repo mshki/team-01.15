@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, RSVPStatus } from "@prisma/client";
 import type { IEventRepository } from "./EventRepository";
 import { DatabaseError, EventNotFoundError } from "../lib/errors";
 import { Ok, Err } from "../lib/result";
@@ -110,12 +110,33 @@ class PrismaRepository implements IEventRepository {
     async findUserRsvp(id: number, userId: string) {
         try {
             const rsvp = await this.client.rSVP.findFirst({
-                where: { eventId: id, userId },
+                where: { eventId: id, userId: userId },
             });
             return Ok(rsvp ? toIRSVP(rsvp) : null);
-        } catch (e) {
+        } catch (e: any) {
+            if (e?.code === "P2025") return Err(EventNotFoundError(`Event ${id} not found`));
             return Err(DatabaseError(String(e)));
         }
+    }
+
+    async saveRsvp(id: number, userId: string, status: RSVPStatus) {
+        try {
+            await this.client.rSVP.upsert({
+                where: {
+                    eventId_userId: {eventId: id, userId: userId}
+                },
+                update: { rsvpStatus: status },
+                create: {
+                    id: `rsvp_${id}_${userId}_${Date.now().toString(36)}`,
+                    eventId: id,
+                    userId,
+                    rsvpStatus: status,
+                },
+            });
+            return Ok(undefined);
+          } catch (e) {
+                return Err(DatabaseError(String(e)));
+          }
     }
 }
 
