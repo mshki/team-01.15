@@ -12,23 +12,25 @@ import { createEventController } from "./controllers/EventController";
 import { createEventService } from "./service/EventService";
 import type { IEventRepository } from "./repository/EventRepository";
 import path from "node:path";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client/index";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { createPrismaRepository } from "./repository/PrismaRepository";
 
 
-export function createComposedApp(logger?: ILoggingService, repoOverride?: IEventRepository): IApp {
+export function createComposedApp(mode: "memory" | "prisma", logger?: ILoggingService): IApp {
   const resolvedLogger = logger ?? CreateLoggingService();
 
-  let eventRepo: IEventRepository = repoOverride ?? createInMemoryEventRepository();
-
-  if (!repoOverride && process.env.REPO_MODE === "prisma") {
-    const rawUrl = process.env.DATABASE_URL!;
-    const dbPath = path.resolve(rawUrl.replace(/^file:/, ""));
-    const adapter = new PrismaBetterSqlite3({ url: dbPath });
-    const prisma = new PrismaClient({ adapter });
-    eventRepo = createPrismaRepository(prisma);
-  }
+  // TODO: should we rename createPrismaRepository to createPrismaEventRepository
+  const eventRepo =
+    mode === "prisma"
+      ? createPrismaRepository(
+          new PrismaClient({
+            adapter: new PrismaBetterSqlite3({
+              url: path.resolve(process.env.DATABASE_URL!.replace(/^file:/, ""))
+            }),
+          }),
+        )
+      : createInMemoryEventRepository();
 
   const authUsers = CreateInMemoryUserRepository();
   const passwordHasher = CreatePasswordHasher();
