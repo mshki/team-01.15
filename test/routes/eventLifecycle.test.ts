@@ -16,7 +16,7 @@ function buildAppWithDeps() {
   const repo = createInMemoryEventRepository();
   const eventService = createEventService(repo, silentLogger);
   const controller = createEventController(eventService, silentLogger);
-  const app = createComposedApp(controller, silentLogger);
+  const app = createComposedApp("test_prisma", silentLogger);
   return { app: app.getExpressApp(), eventService };
 }
 
@@ -51,7 +51,9 @@ async function createEventForTest(
   eventService: ReturnType<typeof buildAppWithDeps>["eventService"],
   overrides: Partial<CreateEventData> = {}
 ): Promise<IEvent> {
-  const result = await eventService.createEvent(makeEventData(overrides));
+  const data = makeEventData(overrides);
+  const session = { userId: data.organizerId, email: "staff@app.test", displayName: "Sam Staff", role: "staff" as const, signedInAt: new Date().toISOString() };
+  const result = await eventService.createEvent(session, data);
   if (!result.ok) {
     throw new Error(`Failed to create test event: ${result.value.message}`);
   }

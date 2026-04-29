@@ -53,7 +53,9 @@ async function createEventForTest(
     service: ReturnType<typeof buildService>["service"],
     overrides: Partial<CreateEventData> = {}
 ): Promise<IEvent> {
-    const result = await service.createEvent(makeEventData(overrides));
+    const data = makeEventData(overrides);
+    const session = { userId: data.organizerId, email: "staff@app.test", displayName: "Sam Staff", role: "staff" as const, signedInAt: new Date().toISOString() };
+    const result = await service.createEvent(session, data);
     if (!result.ok) {
         throw new Error(`Test setup failed to create event: ${result.value.message}`);
     }
