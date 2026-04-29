@@ -346,6 +346,8 @@ class EventController implements IEventController {
       }
 
     async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
+        this.logger.info(`Trying to RSVP to event ${eventId} for user ${user.userId}`);
+
         const result = await this.eventService.toggleRsvp(eventId, user.userId, user.role);
 
         if (!result.ok && (this.isEventError(result.value) || this.isRSVPError(result.value))) {
@@ -371,6 +373,8 @@ class EventController implements IEventController {
             session,
             layout: false,
         });
+        this.logger.info(`Successfully RSVPed to event ${eventId} for user ${user.userId}`);
+
         return;
     
     }
