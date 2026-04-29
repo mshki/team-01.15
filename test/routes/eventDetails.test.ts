@@ -404,11 +404,21 @@ describe("GET /events/:id — memory-only tests", () => {
         return { expressApp, eventService };
     }
 
+    const staffSession = {
+        userId: "user-staff",
+        email: "staff@app.test",
+        displayName: "Sam Staff",
+        role: "staff" as const,
+        signedInAt: new Date().toISOString(),
+    };
+
     async function createEvent(
         service: ReturnType<typeof buildMemoryApp>["eventService"],
         overrides: Partial<CreateEventData> = {}
     ) {
-        const result = await service.createEvent(makeEventData(overrides));
+        const data = makeEventData(overrides);
+        const session = { ...staffSession, userId: data.organizerId ?? staffSession.userId };
+        const result = await service.createEvent(session, data);
         if (!result.ok) throw new Error(`Test setup failed: ${result.value.message}`);
         return result.value;
     }
@@ -464,7 +474,7 @@ describe("GET /events/:id — memory-only tests", () => {
     it("returns 200 for a concluded event", async () => {
         const { expressApp, eventService } = buildMemoryApp();
 
-        const result = await eventService.createEvent(makeEventData({
+        const result = await eventService.createEvent(staffSession, makeEventData({
             status: "CONCLUDED" as CreateEventData["status"],
         }));
         if (!result.ok) throw new Error(`Test setup failed: ${result.value.message}`);
