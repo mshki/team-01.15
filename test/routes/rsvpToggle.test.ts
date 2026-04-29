@@ -1,9 +1,8 @@
 import request from "supertest";
 import { createComposedApp } from "../../src/composition";
-import { createEventController } from "../../src/controllers/EventController";
-import { createEventService } from "../../src/service/EventService";
-import { createInMemoryEventRepository } from "../../src/repository/InMemoryEventRepository";
 import type { ILoggingService } from "../../src/service/LoggingService";
+import { CreateEventData } from "../../src/types/EventTypes";
+
 
 const silentLogger: ILoggingService = {
   info: () => {},
@@ -11,12 +10,9 @@ const silentLogger: ILoggingService = {
   error: () => {},
 };
 
-function buildApp() {
-  const repo = createInMemoryEventRepository();
-  const eventService = createEventService(repo, silentLogger);
-  const controller = createEventController(eventService, silentLogger);
-  const app = createComposedApp(controller, silentLogger);
-  return { expressApp: app.getExpressApp(), eventService, repo };
+function buildApp(mode: "memory" | "prisma" | "test_prisma") {
+  const app = createComposedApp(mode, silentLogger);
+  return app.getExpressApp();
 }
 
 async function loginAs(
@@ -27,46 +23,53 @@ async function loginAs(
   await agent.post("/login").type("form").send({ email, password });
 }
 
-describe("Event RSVP toggle", () => {
+const START_STRING = "2030-06-01T10:00";
+const END_STRING   = "2030-06-01T12:00";
+
+const FUTURE_START = new Date(Date.now() + 24 * 60 * 60 * 1000);
+const FUTURE_END = new Date(FUTURE_START.getTime() + 60 * 60 * 1000);
+
+async function createEvent(
+  agent: any,
+  overrides: Partial<CreateEventData> = {},
+) {
+  const response = await agent
+    .post("/events")
+    .type("form")
+    .send({
+      name: "Test Event",
+      description: "A test event description.",
+      location: "Room 101",
+      category: "",
+      status: "PUBLISHED",
+      startDatetime: START_STRING,
+      endDatetime: END_STRING,
+      capacity: "",
+      ...overrides,
+  });
+
+  expect(response.status).toBe(302);
+}
+describe("memory repo tests RSVP toggle", () => {
   let app: ReturnType<typeof buildApp>;
   let agent: ReturnType<typeof request.agent>;
 
   beforeEach(() => {
-    app = buildApp();
-    agent = request.agent(app.expressApp);
+    app = buildApp("memory");
+    agent = request.agent(app);
   });
 
-  async function makeEvent(repo: any, overrides: Partial<any> = {}) {
-    const event = {
-      id: 1,
-      title: "Test Event",
-      description: "A test event",
-      location: "Test Location",
-      category: "Tech",
-      status: "PUBLISHED",
-      capacity: 2,
-      organizerId: "user-staff",
-      startDatetime: new Date(Date.now() + 86400000).toISOString(),
-      endDatetime: new Date(Date.now() + 90000000).toISOString(),
-      attendees: [],
-      updatedAt: new Date(),
-      ...overrides,
-    };
-
-    repo.events.set(event.id, event);
-
-    return event;
-  }
-
   it("returns 200 and swaps the RSVP panel on a successful toggle", async () => {
-    await loginAs(agent, "user@app.test");
-    await makeEvent(app.repo, {
+    await loginAs(agent, "staff@app.test");
+
+    await createEvent(agent, {
       capacity: 2,
-      attendees: [],
     });
 
+    await loginAs(agent, "user@app.test");
+
     const res = await agent
-      .post("/events/1/rsvp/toggle")
+      .post("/events/2/rsvp/toggle")
       .set("HX-Request", "true")
       .send();
 
@@ -76,23 +79,25 @@ describe("Event RSVP toggle", () => {
   });
 
   it("places a new user on the waitlist when capacity is full", async () => {
-    await loginAs(agent, "user@app.test");
-    await makeEvent(app.repo, {
+    await loginAs(agent, "admin@app.test");
+
+    await createEvent(agent, {
       capacity: 1,
-      organizerId: "user-admin",
-      attendees: [
-        {
-          id: "staff",
-          eventId: 1,
-          userId: "user-staff",
-          rsvpStatus: "GOING",
-          createdAt: new Date(),
-        },
-      ],
     });
 
+    await loginAs(agent, "staff@app.test");
+    const staff_rsvp = await agent
+      .post("/events/2/rsvp/toggle")
+      .set("HX-Request", "true")
+      .send();
+
+    expect(staff_rsvp.status).toBe(200);
+    expect(staff_rsvp.text).toMatch(/Cancel RSVP|RSVP to this event|Reactivate RSVP/);
+    
+    await loginAs(agent, "user@app.test");
+
     const res = await agent
-      .post("/events/1/rsvp/toggle")
+      .post("/events/2/rsvp/toggle")
       .set("HX-Request", "true")
       .send();
 
@@ -101,36 +106,34 @@ describe("Event RSVP toggle", () => {
   });
 
   it("cancels an existing GOING RSVP and updates the response inline", async () => {
-    await loginAs(agent, "user@app.test");
-    await makeEvent(app.repo, {
+    await loginAs(agent, "admin@app.test");
+
+    await createEvent(agent, {
       capacity: 2,
-      attendees: [
-        {
-          id: "rsvp_1_member1_a",
-          eventId: 1,
-          userId: "member-1-id",
-          rsvpStatus: "GOING",
-          createdAt: new Date(),
-        },
-      ],
     });
 
+    await loginAs(agent, "user@app.test");
+    await agent
+      .post("/events/2/rsvp/toggle")
+      .set("HX-Request", "true")
+      .send();
+
     const res = await agent
-      .post("/events/1/rsvp/toggle")
+      .post("/events/2/rsvp/toggle")
       .set("HX-Request", "true")
       .send();
 
     expect(res.status).toBe(200);
     expect(res.text).toContain("Your RSVP");
-    expect(res.text).toMatch(/Cancel RSVP|Reactivate RSVP|RSVP to this event/);
+    expect(res.text).toMatch(/Reactivate RSVP/);
   });
 
   it("returns 403 for an admin trying to RSVP", async () => {
     await loginAs(agent, "admin@app.test");
-    await makeEvent(app.repo);
+    await createEvent(agent);
 
     const res = await agent
-      .post("/events/1/rsvp/toggle")
+      .post("/events/2/rsvp/toggle")
       .set("HX-Request", "true")
       .send();
 
@@ -140,12 +143,10 @@ describe("Event RSVP toggle", () => {
 
   it("returns an error when the organizer tries to RSVP their own event", async () => {
     await loginAs(agent, "staff@app.test");
-    await makeEvent(app.repo, {
-      organizerId: "user-staff",
-    });
+    await createEvent(agent);
 
     const res = await agent
-      .post("/events/1/rsvp/toggle")
+      .post("/events/2/rsvp/toggle")
       .set("HX-Request", "true")
       .send();
 
@@ -154,13 +155,15 @@ describe("Event RSVP toggle", () => {
   });
 
   it("returns an error for cancelled events", async () => {
-    await loginAs(agent, "user@app.test");
-    await makeEvent(app.repo, {
+    await loginAs(agent, "staff@app.test");
+    await createEvent(agent, {
       status: "CANCELLED",
     });
 
+    await loginAs(agent, "user@app.test");
+
     const res = await agent
-      .post("/events/1/rsvp/toggle")
+      .post("/events/2/rsvp/toggle")
       .set("HX-Request", "true")
       .send();
 
@@ -169,13 +172,15 @@ describe("Event RSVP toggle", () => {
   });
 
   it("returns an error for concluded events", async () => {
-    await loginAs(agent, "user@app.test");
-    await makeEvent(app.repo, {
+    await loginAs(agent, "staff@app.test");
+    await createEvent(agent, {
       status: "CONCLUDED",
     });
 
+    await loginAs(agent, "user@app.test");
+
     const res = await agent
-      .post("/events/1/rsvp/toggle")
+      .post("/events/2/rsvp/toggle")
       .set("HX-Request", "true")
       .send();
 
@@ -184,14 +189,16 @@ describe("Event RSVP toggle", () => {
   });
 
   it("returns an error for past events", async () => {
-    await loginAs(agent, "user@app.test");
-    await makeEvent(app.repo, {
-      startDatetime: new Date(Date.now() - 172800000).toISOString(),
-      endDatetime: new Date(Date.now() - 86400000).toISOString(),
+    await loginAs(agent, "staff@app.test");
+    await createEvent(agent, {
+      startDatetime: new Date(Date.now() - 172800000),
+      endDatetime: new Date(Date.now() - 86400000)
     });
 
+    await loginAs(agent, "user@app.test");
+
     const res = await agent
-      .post("/events/1/rsvp/toggle")
+      .post("/events/2/rsvp/toggle")
       .set("HX-Request", "true")
       .send();
 
@@ -200,26 +207,32 @@ describe("Event RSVP toggle", () => {
   });
 
   it("reactivates a cancelled RSVP", async () => {
-    await loginAs(agent, "user@app.test");
-    await makeEvent(app.repo, {
+    await loginAs(agent, "staff@app.test");
+    await createEvent(agent, {
       capacity: 2,
-      attendees: [
-        {
-          id: "rsvp_1_member1_a",
-          eventId: 1,
-          userId: "member-1-id",
-          rsvpStatus: "CANCELLED",
-          createdAt: new Date(),
-        },
-      ],
     });
 
+    await loginAs(agent, "user@app.test");
+
+    // rsvp
+    await agent
+      .post("/events/2/rsvp/toggle")
+      .set("HX-Request", "true")
+      .send();
+
+    // cancel
+    await agent
+      .post("/events/2/rsvp/toggle")
+      .set("HX-Request", "true")
+      .send();
+
+    // reactivate
     const res = await agent
-      .post("/events/1/rsvp/toggle")
+      .post("/events/2/rsvp/toggle")
       .set("HX-Request", "true")
       .send();
 
     expect(res.status).toBe(200);
-    expect(res.text).toMatch(/RSVP to this event|Reactivate RSVP|Cancel RSVP/i);
+    expect(res.text).toMatch(/Cancel RSVP/i);
   });
 });
