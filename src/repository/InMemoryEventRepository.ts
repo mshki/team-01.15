@@ -2,7 +2,7 @@ import { EventNotFoundError, DatabaseError } from "../lib/errors";
 import { Err, Ok, type Result } from "../lib/result";
 import type { EventError } from "../lib/errors";
 import type { IEventRepository } from "./EventRepository";
-import { CreateEventData, Event, IRSVP, type IEvent } from "../types/EventTypes";
+import { CreateEventData, Event, IRSVP, IEvent, RSVPStatus } from "../types/EventTypes";
 
 class InMemoryEventRepository implements IEventRepository {
     private events = new Map<number, IEvent>(
@@ -75,6 +75,36 @@ class InMemoryEventRepository implements IEventRepository {
           ...rsvp,
             createdAt: new Date(rsvp.createdAt),
         });
+    }
+
+    async saveRsvp(id: number, userId: string, status: RSVPStatus): Promise<Result<void, EventError>> {
+        const event = this.events.get(id);
+        if (!event) {
+            return Err(EventNotFoundError(`Event with id ${id} not found`));
+        }
+
+        const existingRsvpIndex = event.attendees.findIndex(
+            (attendee) => attendee.userId === userId
+        );
+
+        if (existingRsvpIndex !== -1) {
+            event.attendees[existingRsvpIndex] = {
+                ...event.attendees[existingRsvpIndex],
+                rsvpStatus: status,
+            };
+        } else {
+            const newRsvp = {
+                id: `rsvp_${id}_${userId}_${Date.now().toString(36)}`,
+                eventId: id,
+                userId,
+                rsvpStatus: status,
+                createdAt: new Date(),
+            };
+            
+            event.attendees.push(newRsvp);
+        }
+    
+        return Ok(undefined);
     }
 }
 
