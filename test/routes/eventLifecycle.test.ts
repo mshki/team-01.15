@@ -206,7 +206,7 @@ describe("event lifecycle HTMX responses", () => {
     expect(res.text).not.toContain("<html");
   });
 
-  it("returns lifecycle partial HTML for HTMX cancel requests", async () => {
+  it("returns an empty success response for HTMX cancel requests", async () => {
     const { app, eventService } = buildAppWithDeps();
     const event = await createEventForTest(eventService, {
       status: "PUBLISHED",
@@ -221,7 +221,6 @@ describe("event lifecycle HTMX responses", () => {
       .set("HX-Request", "true");
 
     expect(res.status).toBe(200);
-    expect(res.text).toContain("Cancelled");
-    expect(res.text).not.toContain("<html");
+    expect(res.text).toBe("");
   });
 });
