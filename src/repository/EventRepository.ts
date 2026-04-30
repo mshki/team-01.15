@@ -44,4 +44,8 @@ export interface IEventRepository {
      * predicates, which scales with the table instead of with the heap.
      */
     searchEvents(query: string): Promise<Result<IEvent[], EventError>>;
+    filterPublishedEvents(
+        timeframe: string,
+        category: string | null
+    ): Promise<Result<IEvent[], EventError>>;
 }

@@ -421,58 +421,11 @@ class EventService implements IEventService {
             `Filtering published events with timeframe "${timeframe}" and category "${category ?? "all"}"`
         );
 
-        const allEventsResult = await this.eventRepository.getAllEvents();
-
-        if (!allEventsResult.ok) {
-            return allEventsResult;
+        if (timeframe !== "all" && timeframe !== "week" && timeframe !== "weekend") {
+            return Err(InvalidEventFilterError("Invalid timeframe filter"));
         }
 
-        const now = new Date();
-
-        let filteredEvents = allEventsResult.value.filter(
-            (event) =>
-                event.status === "PUBLISHED" &&
-                event.endDatetime.getTime() >= now.getTime()
-        );
-
-        if (category && category.trim() !== "") {
-            const normalizedCategory = category.trim().toLowerCase();
-
-            filteredEvents = filteredEvents.filter(
-                (event) => (event.category ?? "").trim().toLowerCase() === normalizedCategory
-            );
-        }
-
-        if (timeframe === "all") {
-            return Ok(filteredEvents);
-        }
-
-        if (timeframe === "week") {
-            const endOfWeek = new Date(now);
-            endOfWeek.setDate(now.getDate() + 7);
-
-            return Ok(
-                filteredEvents.filter(
-                    (event) => event.startDatetime.getTime() <= endOfWeek.getTime()
-                )
-            );
-        }
-
-        if (timeframe === "weekend") {
-            const weekend = this.getUpcomingWeekendRange(now);
-
-            return Ok(
-                filteredEvents.filter((event) => {
-                    const start = event.startDatetime.getTime();
-                    return (
-                        start >= weekend.start.getTime() &&
-                        start <= weekend.end.getTime()
-                    );
-                })
-            );
-        }
-
-        return Err(InvalidEventFilterError("Invalid timeframe filter"));
+        return this.eventRepository.filterPublishedEvents(timeframe, category);
     }
 
     async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {

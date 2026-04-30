@@ -282,6 +282,53 @@ class PrismaRepository implements IEventRepository {
             return Err(DatabaseError(String(e)));
         }
     }
+    async filterPublishedEvents(timeframe: string, category: string | null) {
+        try {
+            const now = new Date();
+
+            const where: any = {
+                status: "PUBLISHED",
+                endDatetime: { gte: now },
+            };
+
+            if (category && category.trim() !== "") {
+                where.category = category.trim().toLowerCase();
+            }
+
+            if (timeframe === "week") {
+                const endOfWeek = new Date(now);
+                endOfWeek.setDate(now.getDate() + 7);
+                where.startDatetime = { lte: endOfWeek };
+            }
+
+            if (timeframe === "weekend") {
+                const day = now.getDay();
+                const daysUntilSaturday = day === 6 ? 0 : (6 - day + 7) % 7;
+
+                const saturday = new Date(now);
+                saturday.setDate(now.getDate() + daysUntilSaturday);
+                saturday.setHours(0, 0, 0, 0);
+
+                const sundayEnd = new Date(saturday);
+                sundayEnd.setDate(saturday.getDate() + 1);
+                sundayEnd.setHours(23, 59, 59, 999);
+
+                where.startDatetime = {
+                    gte: saturday,
+                    lte: sundayEnd,
+                };
+            }
+
+        const events = await this.client.event.findMany({
+            where,
+            include,
+        });
+
+        return Ok(events.map(toIEvent));
+    } catch (e) {
+        return Err(DatabaseError(String(e)));
+    }
+}
 }
 
 export function createPrismaRepository(client: PrismaClient) {
