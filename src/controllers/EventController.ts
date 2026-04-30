@@ -55,6 +55,8 @@ export interface IEventController {
         query: string,
         session: IAppBrowserSession
     ): Promise<void>;
+    showDraftEvents(res: Response, session: IAppBrowserSession): Promise<void>;
+    deleteDraftFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void>;
 }
 
 class EventController implements IEventController {
@@ -113,14 +115,7 @@ class EventController implements IEventController {
             res.status(401);
             return;
         }
-
-        // Only staff or higher can create events
-        if (session.authenticatedUser.role == "user") {
-            this.logger.warn(`User ${session.authenticatedUser.userId} with role "user" attempted to create event.`);
-            res.status(403).end();
-            return;
-        }
-
+        
         // 1. Construct createEventData
         const data = {
             title: name,
@@ -136,7 +131,7 @@ class EventController implements IEventController {
         };
 
         // 2. Call service to create event
-        const result = await this.eventService.createEvent(data);
+        const result = await this.eventService.createEvent(session.authenticatedUser, data);
 
         this.logger.info(`Attempted to create event with name "${name}". Result: ${result.ok ? "Success" : "Error"}`);
 
@@ -352,6 +347,8 @@ class EventController implements IEventController {
       }
 
     async toggleRsvpFromForm(res: Response, eventId: number, user: IAuthenticatedUserSession, session: IAppBrowserSession): Promise<void> {
+        this.logger.info(`Trying to RSVP to event ${eventId} for user ${user.userId}`);
+
         const result = await this.eventService.toggleRsvp(eventId, user.userId, user.role);
 
         if (!result.ok && (this.isEventError(result.value) || this.isRSVPError(result.value))) {
@@ -377,6 +374,8 @@ class EventController implements IEventController {
             session,
             layout: false,
         });
+        this.logger.info(`Successfully RSVPed to event ${eventId} for user ${user.userId}`);
+
         return;
     
     }
@@ -416,7 +415,7 @@ class EventController implements IEventController {
             layout: false,
         });
     }
-        async cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
+    async cancelFromForm(res: Response, eventId: number, session: IAppBrowserSession): Promise<void> {
         const userId = session.authenticatedUser?.userId;
         const isAdmin = session.authenticatedUser?.role === "admin";
 
@@ -444,6 +443,13 @@ class EventController implements IEventController {
                 pageError: error.message,
                 layout: false,
             });
+            return;
+        }
+
+        const isHtmx = res.req.get("HX-Request") === "true";
+
+        if (isHtmx) {
+            res.status(200).send();
             return;
         }
 
@@ -562,6 +568,99 @@ class EventController implements IEventController {
             session,
             pageError: null,
         });
+    }
+    async showDraftEvents(res: Response, session: IAppBrowserSession): Promise<void> {
+        const currentUser = session.authenticatedUser;
+
+        if (!currentUser) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
+                layout: false,
+            });
+            return;
+        }
+
+        if (currentUser.role === "user") {
+            res.status(403).render("partials/error", {
+                message: "Only staff and admins can view draft events.",
+                layout: false,
+            });
+            return;
+        }
+
+        const result = await this.eventService.getDraftEventsForUser(
+            currentUser.userId,
+            currentUser.role
+        );
+
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            res.status(status).render("partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("partials/error", {
+                message: "Unable to load draft events.",
+                layout: false,
+            });
+            return;
+        }
+
+        res.render("events/drafts", {
+            events: result.value,
+            session,
+            pageError: null,
+        });
+    }
+    async deleteDraftFromForm(
+        res: Response,
+        eventId: number,
+        session: IAppBrowserSession
+    ): Promise<void> {
+        const currentUser = session.authenticatedUser;
+
+        if (!currentUser) {
+            res.status(401).render("partials/error", {
+                message: "Please log in to continue.",
+                layout: false,
+            });
+            return;
+        }
+
+        const result = await this.eventService.deleteDraftEvent(
+            eventId,
+            currentUser.userId,
+            currentUser.role
+        );
+
+        if (!result.ok && this.isEventError(result.value)) {
+            const status = this.mapErrorStatus(result.value);
+            res.status(status).render("partials/error", {
+                message: result.value.message,
+                layout: false,
+            });
+            return;
+        }
+
+        if (!result.ok) {
+            res.status(500).render("partials/error", {
+                message: "Unable to delete draft event.",
+                layout: false,
+            });
+            return;
+        }
+
+        const isHtmx = res.req.get("HX-Request") === "true";
+        if (isHtmx) {
+            res.status(200).send();
+            return;
+        }
+
+        res.redirect("/events/drafts");
     }
 }
 

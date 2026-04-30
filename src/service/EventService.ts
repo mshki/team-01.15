@@ -25,7 +25,7 @@ import { UserRole } from "../auth/User";
 
 
 export interface IEventService {
-    createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
+    createEvent(session: IAuthenticatedUserSession, eventData: CreateEventData): Promise<Result<IEvent, EventError>>;
     getEventDetails(eventId: number): Promise<Result<IEvent, EventError>>;
     getEventEditForm(eventId: number, userId: String, userRole: string): Promise<Result<IEvent, EventError>>;
     updateEvent(eventId: number, 
@@ -58,6 +58,8 @@ export interface IEventService {
      * createdAt (earliest join is #1).
      */
     getQueuePosition(eventId: number, userId: string): Promise<Result<number | null, EventError>>;
+    getDraftEventsForUser(userId: string, userRole: string): Promise<Result<IEvent[], EventError>>;
+    deleteDraftEvent(eventId: number, userId: string, userRole: string): Promise<Result<void, EventError>>;
 }
 
 class EventService implements IEventService {
@@ -97,35 +99,13 @@ class EventService implements IEventService {
         return idx === -1 ? null : idx + 1;
       }
 
-      /**
-       * Promotes the earliest waitlisted RSVP to GOING if there is capacity.
-       * Mutates the passed event in-place; the caller is responsible for
-       * persisting the event in the same repository write so the cancel
-       * and promotion land atomically.
-       */
-      private promoteWaitlistedIfPossible(event: IEvent): IRSVP | null {
-        if (event.capacity === null) {
-          return null;
+    async createEvent(session: IAuthenticatedUserSession, eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
+        // Only staff or higher can create events
+        if (session.role == "user") {
+            this.logger.warn(`User ${session.userId} with role "user" attempted to create event.`);
+            return Err(UnauthorizedEventActionError("Only staff or higher can create events."));
         }
-
-        const goingCount = this.countGoing(event.attendees);
-        if (goingCount >= event.capacity) {
-          return null;
-        }
-
-        const waitlisted = this.orderedWaitlist(event)[0];
-        if (!waitlisted) {
-          return null;
-        }
-
-        waitlisted.rsvpStatus = "GOING";
-        this.logger.info(
-          `Promoted user ${waitlisted.userId} from waitlist to GOING on event ${event.id}`
-        );
-        return waitlisted;
-      }
-
-    async createEvent(eventData: CreateEventData): Promise<Result<IEvent, EventError>> {
+        
         // 1. Validate input data
         const title = String(eventData.title ?? "").trim();
         const description = String(eventData.description ?? "").trim();
@@ -304,56 +284,32 @@ class EventService implements IEventService {
             return Err(EventNotFoundError(`Event ${eventId} not found.`));
         } 
 
-        if (!existing.value) {
-            // the case of null return from service
+        if (!existing.value || existing.value.rsvpStatus === "CANCELLED") {
             const status = this.nextJoinStatus(event);
       
-            updatedRsvp = {
-                id: `rsvp_${eventId}_${userId}_${Date.now().toString(36)}`,
-                eventId,
-                userId,
-                rsvpStatus: status,
-                createdAt: new Date(),
-            };
-      
-            event.attendees.push(updatedRsvp);
-        } else if (existing.value.rsvpStatus === "CANCELLED") {
-            const status = this.nextJoinStatus(event);
-            updatedRsvp = {
-                ...existing.value,
-                rsvpStatus: status,
-            };
-
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
-            );
-
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
-            } else {
-                event.attendees.push(updatedRsvp);
+            const res = await this.eventRepository.saveRsvp(eventId, userId, status);
+            if (!res.ok) {
+                return Err(DatabaseError(`Update RSVP to event ${eventId} for user ${userId} failed.`))
             }
         } else {
-            const wasGoing = existing.value.rsvpStatus === "GOING";
-
-            updatedRsvp = {
-                ...existing.value,
-                rsvpStatus: "CANCELLED",
-            };
-
-            const idx = event.attendees.findIndex(
-                (r) => r.eventId === eventId && r.userId === userId
+            // Cancel branch: delegate to the repository's atomic cancel + promote.
+            // The repo method wraps the RSVP cancel and the (possibly empty) waitlist
+            // promotion in one transaction (Prisma) or one synchronous mutation
+            // (InMemory), so we never end up with the cancel persisted but the
+            // promotion lost. It returns the refreshed event with up-to-date
+            // attendees, which is exactly what callers expect.
+            const cancelled = await this.eventRepository.cancelRsvpWithPromotion(
+                eventId,
+                userId
             );
-
-            if (idx >= 0) {
-                event.attendees[idx] = updatedRsvp;
-            } else {
-                event.attendees.push(updatedRsvp);
+            if (!cancelled.ok) {
+                return Err(
+                    DatabaseError(
+                        `Cancel RSVP to event ${eventId} for user ${userId} failed.`
+                    )
+                );
             }
-
-            if (wasGoing) {
-                this.promoteWaitlistedIfPossible(event);
-            }
+            return Ok(cancelled.value);
         }
 
         event.updatedAt = new Date();
@@ -465,58 +421,11 @@ class EventService implements IEventService {
             `Filtering published events with timeframe "${timeframe}" and category "${category ?? "all"}"`
         );
 
-        const allEventsResult = await this.eventRepository.getAllEvents();
-
-        if (!allEventsResult.ok) {
-            return allEventsResult;
+        if (timeframe !== "all" && timeframe !== "week" && timeframe !== "weekend") {
+            return Err(InvalidEventFilterError("Invalid timeframe filter"));
         }
 
-        const now = new Date();
-
-        let filteredEvents = allEventsResult.value.filter(
-            (event) =>
-                event.status === "PUBLISHED" &&
-                event.endDatetime.getTime() >= now.getTime()
-        );
-
-        if (category && category.trim() !== "") {
-            const normalizedCategory = category.trim().toLowerCase();
-
-            filteredEvents = filteredEvents.filter(
-                (event) => (event.category ?? "").trim().toLowerCase() === normalizedCategory
-            );
-        }
-
-        if (timeframe === "all") {
-            return Ok(filteredEvents);
-        }
-
-        if (timeframe === "week") {
-            const endOfWeek = new Date(now);
-            endOfWeek.setDate(now.getDate() + 7);
-
-            return Ok(
-                filteredEvents.filter(
-                    (event) => event.startDatetime.getTime() <= endOfWeek.getTime()
-                )
-            );
-        }
-
-        if (timeframe === "weekend") {
-            const weekend = this.getUpcomingWeekendRange(now);
-
-            return Ok(
-                filteredEvents.filter((event) => {
-                    const start = event.startDatetime.getTime();
-                    return (
-                        start >= weekend.start.getTime() &&
-                        start <= weekend.end.getTime()
-                    );
-                })
-            );
-        }
-
-        return Err(InvalidEventFilterError("Invalid timeframe filter"));
+        return this.eventRepository.filterPublishedEvents(timeframe, category);
     }
 
     async searchEvents(query: string): Promise<Result<IEvent[], EventError>> {
@@ -540,47 +449,19 @@ class EventService implements IEventService {
             );
         }
 
-        // Normalize once so every field comparison uses the same lowercased,
-        // trimmed form and callers don't have to worry about whitespace or case.
+        // Normalize once so the storage layer gets a single, predictable form.
+        // The repository contract treats `query` as already trimmed + lowercased
+        // and as already meaning "no text filter" when empty. This service
+        // method owns the validation; the repo owns the filter.
         const normalized = query.trim().toLowerCase();
         this.logger.info(`searchEvents called with query "${normalized}"`);
 
-        const allEventsResult = await this.eventRepository.getAllEvents();
-        if (!allEventsResult.ok) {
-            return allEventsResult;
-        }
-
-        // Apply the "published + upcoming" predicate first — same rule as
-        // filterPublishedEvents uses. Search results should never expose drafts,
-        // cancelled events, or events that have already ended.
-        const now = new Date();
-        const publishedUpcoming = allEventsResult.value.filter(
-            (event) =>
-                event.status === "PUBLISHED" &&
-                event.endDatetime.getTime() >= now.getTime()
-        );
-
-        // Spec: empty query returns all published upcoming events.
-        if (normalized === "") {
-            return Ok(publishedUpcoming);
-        }
-
-        // Spec: match against multiple fields. Case-insensitive substring match
-        // on any of title, description, location, or category is enough to
-        // include the event.
-        const matches = publishedUpcoming.filter((event) => {
-            const haystacks = [
-                event.title,
-                event.description,
-                event.location,
-                event.category ?? "",
-            ];
-            return haystacks.some((field) =>
-                field.toLowerCase().includes(normalized)
-            );
-        });
-
-        return Ok(matches);
+        // Push the filter into the repository. The Prisma implementation
+        // turns this into a single SQL query (status + endDatetime + OR of
+        // contains across the four fields); the in-memory implementation
+        // mirrors the same logic on the event map. Either way, we no
+        // longer pull every event into the service to filter in JS.
+        return this.eventRepository.searchEvents(normalized);
     }
 
     private getUpcomingWeekendRange(now: Date): { start: Date; end: Date } {
@@ -596,6 +477,58 @@ class EventService implements IEventService {
         sundayEnd.setHours(23, 59, 59, 999);
 
         return { start: saturday, end: sundayEnd };
+    }
+    async getDraftEventsForUser(
+        userId: string,
+        userRole: string
+    ): Promise<Result<IEvent[], EventError>> {
+        this.logger.info(`Fetching draft events for user ${userId} with role ${userRole}`);
+
+        const allEventsResult = await this.eventRepository.getAllEvents();
+
+        if (!allEventsResult.ok) {
+            return allEventsResult;
+        }
+
+        const drafts = allEventsResult.value.filter((event) => {
+            if (event.status !== "DRAFT") {
+                return false;
+            }
+
+            if (userRole === "admin") {
+                return true;
+            }
+
+            return event.organizerId === userId;
+        });
+
+        return Ok(drafts);
+    }
+    async deleteDraftEvent(
+        eventId: number,
+        userId: string,
+        userRole: string
+    ): Promise<Result<void, EventError>> {
+        this.logger.info(`User ${userId} is deleting draft event ${eventId}`);
+
+        const eventResult = await this.eventRepository.getEventById(eventId);
+        if (!eventResult.ok) {
+            return Err(eventResult.value as EventError);
+        }
+
+        const event = eventResult.value;
+        const isAdmin = userRole === "admin";
+        const isOrganizer = event.organizerId === userId;
+
+        if (!isAdmin && !isOrganizer) {
+            return Err(UnauthorizedEventActionError("Only the organizer or an admin can delete this draft event"));
+        }
+
+        if (event.status !== "DRAFT") {
+            return Err(InvalidEventTransitionError("Only draft events can be deleted"));
+        }
+
+        return await this.eventRepository.deleteEvent(eventId);
     }
 
 

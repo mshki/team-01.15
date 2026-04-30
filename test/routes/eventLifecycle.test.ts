@@ -1,8 +1,13 @@
 import request from "supertest";
-import { createComposedApp } from "../../src/composition";
 import { createEventController } from "../../src/controllers/EventController";
 import { createEventService } from "../../src/service/EventService";
 import { createInMemoryEventRepository } from "../../src/repository/InMemoryEventRepository";
+import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserRepository";
+import { CreatePasswordHasher } from "../../src/auth/PasswordHasher";
+import { CreateAuthService } from "../../src/auth/AuthService";
+import { CreateAdminUserService } from "../../src/auth/AdminUserService";
+import { CreateAuthController } from "../../src/auth/AuthController";
+import { CreateApp } from "../../src/app";
 import type { ILoggingService } from "../../src/service/LoggingService";
 import type { CreateEventData, IEvent } from "../../src/types/EventTypes";
 
@@ -15,8 +20,13 @@ const silentLogger: ILoggingService = {
 function buildAppWithDeps() {
   const repo = createInMemoryEventRepository();
   const eventService = createEventService(repo, silentLogger);
-  const controller = createEventController(eventService, silentLogger);
-  const app = createComposedApp(controller, silentLogger);
+  const eventController = createEventController(eventService, silentLogger);
+  const authUsers = CreateInMemoryUserRepository();
+  const passwordHasher = CreatePasswordHasher();
+  const authService = CreateAuthService(authUsers, passwordHasher);
+  const adminUserService = CreateAdminUserService(authUsers, passwordHasher);
+  const authController = CreateAuthController(authService, adminUserService, silentLogger);
+  const app = CreateApp(eventController, authController, silentLogger, eventService);
   return { app: app.getExpressApp(), eventService };
 }
 
@@ -51,7 +61,9 @@ async function createEventForTest(
   eventService: ReturnType<typeof buildAppWithDeps>["eventService"],
   overrides: Partial<CreateEventData> = {}
 ): Promise<IEvent> {
-  const result = await eventService.createEvent(makeEventData(overrides));
+  const data = makeEventData(overrides);
+  const session = { userId: data.organizerId, email: "staff@app.test", displayName: "Sam Staff", role: "staff" as const, signedInAt: new Date().toISOString() };
+  const result = await eventService.createEvent(session, data);
   if (!result.ok) {
     throw new Error(`Failed to create test event: ${result.value.message}`);
   }
@@ -194,7 +206,7 @@ describe("event lifecycle HTMX responses", () => {
     expect(res.text).not.toContain("<html");
   });
 
-  it("returns lifecycle partial HTML for HTMX cancel requests", async () => {
+  it("returns an empty success response for HTMX cancel requests", async () => {
     const { app, eventService } = buildAppWithDeps();
     const event = await createEventForTest(eventService, {
       status: "PUBLISHED",
@@ -209,7 +221,6 @@ describe("event lifecycle HTMX responses", () => {
       .set("HX-Request", "true");
 
     expect(res.status).toBe(200);
-    expect(res.text).toContain("Cancelled");
-    expect(res.text).not.toContain("<html");
+    expect(res.text).toBe("");
   });
 });

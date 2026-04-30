@@ -6,9 +6,6 @@ import path from "node:path";
 import type { IApp, IServer } from "./contracts";
 import { createComposedApp } from "./composition";
 import { CreateLoggingService } from "./service/LoggingService";
-import { createInMemoryEventRepository } from "./repository/InMemoryEventRepository";
-import { createEventService } from "./service/EventService";
-import { createEventController } from "./controllers/EventController";
 
 export class HttpServer implements IServer {
   constructor(private readonly app: IApp) {}
@@ -45,12 +42,9 @@ export class HttpServer implements IServer {
 }
 
 const logger = CreateLoggingService();
-const eventRepository = createInMemoryEventRepository();
-const eventService = createEventService(eventRepository, logger);
-const eventController = createEventController(eventService, logger);
-
+const mode: "memory" | "prisma" | "test_prisma" = (process.env.REPO_MODE as "memory" | "prisma" | "test_prisma") || "memory";
 const port = Number(process.env.HTTPS_PORT ?? process.env.PORT ?? 3443);
-const app = createComposedApp(eventController, logger);
+const app = createComposedApp(mode, logger);
 const server = new HttpServer(app);
 
 server.start(port);

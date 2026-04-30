@@ -297,6 +297,20 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.get(
+      "/events/drafts",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.showDraftEvents(res, browserSession);
+      }),
+    );
+
+
+
     // —— Feature 3: Event Editing ————————————————————————————————————————————————
 
     this.app.get(
@@ -449,6 +463,8 @@ class ExpressApp implements IApp {
       }),
     );
 
+    // ── Feature 5: Event publish/cancel ─────────────────────────────────────────────────
+
     this.app.post(
       "/events/:id/publish",
       asyncHandler(async (req, res) => {
@@ -508,6 +524,29 @@ class ExpressApp implements IApp {
         await this.controller.cancelFromForm(res, eventId, browserSession);
       }),
     );
+
+    this.app.post(
+      "/events/:id/delete",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const eventId = Number(req.params.id);
+        if (!Number.isInteger(eventId) || eventId <= 0) {
+          res.status(400).render("partials/error", {
+            message: "Invalid event ID.",
+            layout: false,
+          });
+          return;
+        }
+
+        const browserSession = touchAppSession(sessionStore(req));
+        await this.controller.deleteDraftFromForm(res, eventId, browserSession);
+      }),
+    );
+
+    // ── Feature 6: Event Filter ─────────────────────────────────────────────────
 
     this.app.get(
       "/events",

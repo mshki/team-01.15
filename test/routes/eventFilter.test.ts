@@ -1,8 +1,5 @@
 import request from "supertest";
 import { createComposedApp } from "../../src/composition";
-import { createEventController } from "../../src/controllers/EventController";
-import { createEventService } from "../../src/service/EventService";
-import { createInMemoryEventRepository } from "../../src/repository/InMemoryEventRepository";
 import type { ILoggingService } from "../../src/service/LoggingService";
 
 const silentLogger: ILoggingService = {
@@ -11,11 +8,11 @@ const silentLogger: ILoggingService = {
   error: () => {},
 };
 
+// `createComposedApp` owns the repo/service/controller wiring internally and
+// only takes the mode + logger. Match the pattern used by rsvpToggle.test.ts —
+// the older signature this file was written against is gone.
 function buildApp() {
-  const repo = createInMemoryEventRepository();
-  const eventService = createEventService(repo, silentLogger);
-  const controller = createEventController(eventService, silentLogger);
-  const app = createComposedApp(controller, silentLogger);
+  const app = createComposedApp("memory", silentLogger);
   return app.getExpressApp();
 }
 

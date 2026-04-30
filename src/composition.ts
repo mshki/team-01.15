@@ -8,21 +8,42 @@ import type { IApp } from "./contracts";
 import { CreateLoggingService } from "./service/LoggingService";
 import type { ILoggingService } from "./service/LoggingService";
 import { createInMemoryEventRepository } from "./repository/InMemoryEventRepository";
-import { IEventController } from "./controllers/EventController";
+import { createEventController } from "./controllers/EventController";
 import { createEventService } from "./service/EventService";
+import type { IEventRepository } from "./repository/EventRepository";
+import path from "node:path";
+import { PrismaClient } from "@prisma/client/index";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { createPrismaRepository } from "./repository/PrismaRepository";
 
 
-export function createComposedApp(eventController: IEventController, logger?: ILoggingService): IApp {
+export function createComposedApp(mode: "memory" | "prisma" | "test_prisma", logger?: ILoggingService): IApp {
   const resolvedLogger = logger ?? CreateLoggingService();
 
-  // Authentication & authorization wiring
+  // TODO: should we rename createPrismaRepository to createPrismaEventRepository
+  const dbUrl =
+    mode === "test_prisma"
+      ? process.env.TEST_DB_URL!.replace(/^file:/, "")
+      : process.env.DATABASE_URL!.replace(/^file:/, "");
+
+  const eventRepo =
+    mode === "memory"
+      ? createInMemoryEventRepository()
+      : createPrismaRepository(
+          new PrismaClient({
+            adapter: new PrismaBetterSqlite3({
+              url: path.resolve(dbUrl),
+            }),
+          }),
+        );
+
   const authUsers = CreateInMemoryUserRepository();
   const passwordHasher = CreatePasswordHasher();
   const authService = CreateAuthService(authUsers, passwordHasher);
   const adminUserService = CreateAdminUserService(authUsers, passwordHasher);
   const authController = CreateAuthController(authService, adminUserService, resolvedLogger);
-  const eventRepo = createInMemoryEventRepository();
   const eventService = createEventService(eventRepo, resolvedLogger);
+  const eventController = createEventController(eventService, resolvedLogger);
 
   return CreateApp(eventController, authController, resolvedLogger, eventService);
 }

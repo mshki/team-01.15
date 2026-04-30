@@ -1,0 +1,86 @@
+<section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
+  <h1 class="text-3xl font-bold text-slate-900 mb-3">Draft Events</h1>
+  <p class="text-slate-500">
+    View and manage draft events before publishing them.
+  </p>
+</section>
+
+<% if (pageError) { %>
+  <%- include("../partials/error", { message: pageError }) %>
+<% } %>
+
+<section class="grid gap-4">
+  <% if (!events || events.length === 0) { %>
+    <div class="p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
+      <p class="text-slate-500 mb-0">No draft events found.</p>
+    </div>
+  <% } %>
+
+  <% events.forEach((event) => { %>
+    <article class="p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 class="text-xl font-semibold text-slate-900 mb-1"><%= event.title %></h2>
+          <p class="text-slate-500 text-sm mb-2"><%= event.location %></p>
+
+          <% if (event.category) { %>
+            <p class="text-sm text-slate-500 mb-2">Category: <%= event.category %></p>
+          <% } %>
+
+          <p class="text-slate-700 mb-3"><%= event.description %></p>
+
+          <span class="inline-block px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+            Draft
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <a
+            href="/events/<%= event.id %>"
+            class="inline-block px-4 py-2.5 rounded-lg bg-white text-slate-700 border border-slate-300 font-medium hover:bg-slate-50 no-underline text-sm"
+          >
+            View
+          </a>
+
+          <a
+            href="/events/<%= event.id %>/edit"
+            class="inline-block px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 no-underline text-sm"
+          >
+            Edit
+          </a>
+
+          <form
+            method="post"
+            action="/events/<%= event.id %>/publish"
+            hx-post="/events/<%= event.id %>/publish"
+            hx-target="closest article"
+            hx-swap="delete"
+          >
+            <button
+              type="submit"
+              class="w-full px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 cursor-pointer text-sm"
+            >
+              Publish
+            </button>
+          </form>
+
+          <form
+            method="post"
+            action="/events/<%= event.id %>/delete"
+            hx-post="/events/<%= event.id %>/delete"
+            hx-target="closest article"
+            hx-swap="delete"
+          >
+            <button
+              type="submit"
+              class="w-full px-4 py-2.5 rounded-lg bg-white text-red-700 border border-red-300 font-medium hover:bg-red-50 cursor-pointer text-sm"
+              onclick="return confirm('Delete this draft? This cannot be undone.')"
+            >
+              Delete Draft
+            </button>
+          </form>
+        </div>
+      </div>
+    </article>
+  <% }) %>
+</section>
