@@ -218,6 +218,64 @@ class InMemoryEventRepository implements IEventRepository {
 
         return Ok(matches);
     }
+
+    async filterPublishedEvents(
+        timeframe: string,
+        category: string | null
+    ): Promise<Result<IEvent[], EventError>> {
+        const now = new Date();
+
+        let filteredEvents = Array.from(this.events.values()).filter(
+            (event) =>
+                event.status === "PUBLISHED" &&
+                event.endDatetime.getTime() >= now.getTime()
+        );
+
+        if (category && category.trim() !== "") {
+            const normalizedCategory = category.trim().toLowerCase();
+
+            filteredEvents = filteredEvents.filter(
+                (event) => (event.category ?? "").trim().toLowerCase() === normalizedCategory
+            );
+        }
+
+        if (timeframe === "all") {
+            return Ok(filteredEvents);
+        }
+
+        if (timeframe === "week") {
+            const endOfWeek = new Date(now);
+            endOfWeek.setDate(now.getDate() + 7);
+
+            return Ok(
+                filteredEvents.filter(
+                    (event) => event.startDatetime.getTime() <= endOfWeek.getTime()
+                )
+            );
+        }
+
+        if (timeframe === "weekend") {
+            const day = now.getDay();
+            const daysUntilSaturday = day === 6 ? 0 : (6 - day + 7) % 7;
+
+            const saturday = new Date(now);
+            saturday.setDate(now.getDate() + daysUntilSaturday);
+            saturday.setHours(0, 0, 0, 0);
+
+            const sundayEnd = new Date(saturday);
+            sundayEnd.setDate(saturday.getDate() + 1);
+            sundayEnd.setHours(23, 59, 59, 999);
+
+            return Ok(
+                filteredEvents.filter((event) => {
+                    const start = event.startDatetime.getTime();
+                    return start >= saturday.getTime() && start <= sundayEnd.getTime();
+                })
+            );
+        }
+
+        return Err(ValidationError("Invalid timeframe filter"));
+    }
 }
 
 export function createInMemoryEventRepository(): IEventRepository {
