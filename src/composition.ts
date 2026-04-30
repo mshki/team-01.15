@@ -3,6 +3,8 @@ import { CreateAuthController } from "./auth/AuthController";
 import { CreateAuthService } from "./auth/AuthService";
 import { CreateInMemoryUserRepository } from "./auth/InMemoryUserRepository";
 import { CreatePasswordHasher } from "./auth/PasswordHasher";
+import { NoopUserSink, type IUserSink } from "./auth/UserSink";
+import { PrismaUserSink } from "./auth/PrismaUserSink";
 import { CreateApp } from "./app";
 import type { IApp } from "./contracts";
 import { CreateLoggingService } from "./service/LoggingService";
@@ -26,21 +28,31 @@ export function createComposedApp(mode: "memory" | "prisma" | "test_prisma", log
       ? process.env.TEST_DB_URL!.replace(/^file:/, "")
       : process.env.DATABASE_URL!.replace(/^file:/, "");
 
-  const eventRepo =
+  // Build the Prisma client once (in Prisma modes) so the events repository
+  // and the user sink share the same connection.
+  const prismaClient =
     mode === "memory"
-      ? createInMemoryEventRepository()
-      : createPrismaRepository(
-          new PrismaClient({
-            adapter: new PrismaBetterSqlite3({
-              url: path.resolve(dbUrl),
-            }),
+      ? null
+      : new PrismaClient({
+          adapter: new PrismaBetterSqlite3({
+            url: path.resolve(dbUrl),
           }),
-        );
+        });
+
+  const eventRepo: IEventRepository =
+    prismaClient === null
+      ? createInMemoryEventRepository()
+      : createPrismaRepository(prismaClient);
+
+  // In memory mode there is no second store to mirror users into; in Prisma
+  // modes we mirror new users so RSVP/Event FKs resolve.
+  const userSink: IUserSink =
+    prismaClient === null ? new NoopUserSink() : new PrismaUserSink(prismaClient);
 
   const authUsers = CreateInMemoryUserRepository();
   const passwordHasher = CreatePasswordHasher();
   const authService = CreateAuthService(authUsers, passwordHasher);
-  const adminUserService = CreateAdminUserService(authUsers, passwordHasher);
+  const adminUserService = CreateAdminUserService(authUsers, passwordHasher, userSink);
   const authController = CreateAuthController(authService, adminUserService, resolvedLogger);
   const eventService = createEventService(eventRepo, resolvedLogger);
   const eventController = createEventController(eventService, resolvedLogger);
