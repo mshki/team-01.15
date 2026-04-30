@@ -49,8 +49,20 @@
 
     <div class="flex items-center gap-2 flex-wrap">
       <% if (isWaitlisted && queuePosition) { %>
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
-          Waitlisted · #<%= queuePosition %>
+        <%# The waitlist indicator deliberately uses indigo + a clock icon +
+            an inset position chip so it reads as a queue indicator, not as
+            another event-status pill. PUBLISHED/DRAFT/CANCELLED/CONCLUDED
+            already own the green/yellow/red/slate vocabulary; this sits
+            in a separate visual register. %>
+        <span class="inline-flex items-center gap-2 pl-2.5 pr-1.5 py-1 rounded-full text-sm font-medium bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200">
+          <svg class="w-4 h-4 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          Waitlisted
+          <span class="inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full bg-indigo-600 text-white text-xs font-bold">
+            #<%= queuePosition %>
+          </span>
         </span>
       <% } %>
       <% if (canEdit) { %>
@@ -194,8 +206,19 @@
           <% } %>
 
           <% if (isWaitlisted && queuePosition) { %>
-            <dd class="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5">
-              You're #<%= queuePosition %> in line — we'll auto-promote you when a spot opens up.
+            <%# Mirrors the header pill's indigo palette so the two
+                indicators reinforce each other. The position is bolded
+                so the eye lands on "#3" first; the explanatory tail is
+                kept lighter so it reads as supporting context. %>
+            <dd class="mt-2 text-xs text-indigo-900 bg-indigo-50 ring-1 ring-indigo-200 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+              <svg class="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+              <span>
+                <span class="font-semibold">You're #<%= queuePosition %> in line</span>
+                <span class="text-indigo-700"> — we'll auto-promote you when a spot opens up.</span>
+              </span>
             </dd>
           <% } %>
         </div>
