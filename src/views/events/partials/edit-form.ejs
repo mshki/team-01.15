@@ -34,7 +34,10 @@
 
 %>
 
-<div id="edit-event-shell" hx-ext="response-targets">
+<div id="edit-event-shell" 
+  hx-ext="response-targets" 
+  x-data="{ isDirty: false }"
+  @beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }">
   <section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
     <h1 class="text-3xl font-bold text-slate-900 mb-3">Edit Event</h1>
     <p class="text-slate-600">Update the details for <strong><%= event.title %></strong>.</p>
@@ -158,6 +161,7 @@
 
         <a
           href="/events/<%= event.id %>"
+          @click="if (isDirty && !confirm('You have unsaved changes. Are you sure you want to discard them?')) $event.preventDefault()"
           class="px-4 py-2.5 rounded-lg bg-white text-slate-700 border border-slate-300 font-medium hover:bg-slate-50 no-underline"
         >
           Cancel
