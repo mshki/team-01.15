@@ -8,6 +8,7 @@ import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserReposit
 import { CreatePasswordHasher } from "../../src/auth/PasswordHasher";
 import { CreateAuthService } from "../../src/auth/AuthService";
 import { CreateAdminUserService } from "../../src/auth/AdminUserService";
+import { NoopUserSink } from "../../src/auth/UserSink";
 import { CreateAuthController } from "../../src/auth/AuthController";
 import { createEventController } from "../../src/controllers/EventController";
 import { CreateApp } from "../../src/app";
@@ -397,7 +398,7 @@ describe("GET /events/:id — memory-only tests", () => {
         const authUsers = CreateInMemoryUserRepository();
         const passwordHasher = CreatePasswordHasher();
         const authService = CreateAuthService(authUsers, passwordHasher);
-        const adminUserService = CreateAdminUserService(authUsers, passwordHasher);
+        const adminUserService = CreateAdminUserService(authUsers, passwordHasher, new NoopUserSink());
         const authController = CreateAuthController(authService, adminUserService, silentLogger);
         const eventController = createEventController(eventService, silentLogger);
         const expressApp = CreateApp(eventController, authController, silentLogger, eventService).getExpressApp();

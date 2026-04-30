@@ -11,6 +11,7 @@ import {
 } from "./errors";
 import { toUserSummary, type IUserSummary, type UserRole } from "./User";
 import type { IUserRepository } from "./UserRepository";
+import type { IUserSink } from "./UserSink";
 
 export interface CreateUserInput {
   email: string;
@@ -29,6 +30,7 @@ class AdminUserService implements IAdminUserService {
   constructor(
     private readonly users: IUserRepository,
     private readonly passwordHasher: IPasswordHasher,
+    private readonly userSink: IUserSink,
   ) {}
 
   async listUsers(): Promise<Result<IUserSummary[], AuthError>> {
@@ -82,7 +84,25 @@ class AdminUserService implements IAdminUserService {
       return Err(UnexpectedDependencyError(createResult.value.message));
     }
 
-    return Ok(toUserSummary(createResult.value));
+    const created = createResult.value;
+
+    // Mirror the user into any downstream store (e.g. Prisma's User table) so
+    // foreign keys like RSVP.userId → User.id can resolve. If the sink fails,
+    // roll back the in-memory create so we don't end up with an auth-only
+    // orphan that would FK-fail later.
+    const syncResult = await this.userSink.syncUser({
+      id: created.id,
+      email: created.email,
+      displayName: created.displayName,
+      role: created.role,
+    });
+
+    if (syncResult.ok === false) {
+      await this.users.deleteUser(created.id);
+      return Err(syncResult.value);
+    }
+
+    return Ok(toUserSummary(created));
   }
 
   async deleteUser(id: string, actingUserId: string): Promise<Result<void, AuthError>> {
@@ -119,6 +139,7 @@ class AdminUserService implements IAdminUserService {
 export function CreateAdminUserService(
   users: IUserRepository,
   passwordHasher: IPasswordHasher,
+  userSink: IUserSink,
 ): IAdminUserService {
-  return new AdminUserService(users, passwordHasher);
+  return new AdminUserService(users, passwordHasher, userSink);
 }
