@@ -6,6 +6,7 @@ import { CreateInMemoryUserRepository } from "../../src/auth/InMemoryUserReposit
 import { CreatePasswordHasher } from "../../src/auth/PasswordHasher";
 import { CreateAuthService } from "../../src/auth/AuthService";
 import { CreateAdminUserService } from "../../src/auth/AdminUserService";
+import { NoopUserSink } from "../../src/auth/UserSink";
 import { CreateAuthController } from "../../src/auth/AuthController";
 import { CreateApp } from "../../src/app";
 import type { ILoggingService } from "../../src/service/LoggingService";
@@ -24,7 +25,7 @@ function buildAppWithDeps() {
   const authUsers = CreateInMemoryUserRepository();
   const passwordHasher = CreatePasswordHasher();
   const authService = CreateAuthService(authUsers, passwordHasher);
-  const adminUserService = CreateAdminUserService(authUsers, passwordHasher);
+  const adminUserService = CreateAdminUserService(authUsers, passwordHasher, new NoopUserSink());
   const authController = CreateAuthController(authService, adminUserService, silentLogger);
   const app = CreateApp(eventController, authController, silentLogger, eventService);
   return { app: app.getExpressApp(), eventService };
