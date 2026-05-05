@@ -1,89 +1,113 @@
-<section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
-  <h1 class="text-3xl font-bold text-slate-900 mb-3">Welcome to Project Starter</h1>
-  <p class="text-slate-500">
-    You are signed in and ready to build. This placeholder page is where your
-    project's main content will go.
-  </p>
-  <div class="flex gap-3 flex-wrap">
-    <a
-      href="/events"
-      class="inline-flex items-center px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium no-underline hover:bg-blue-700"
-    >
-      Browse Events
-    </a>
-    <% if (session.authenticatedUser && (session.authenticatedUser.role === 'staff' || session.authenticatedUser.role === 'admin')) { %>
-      <a
-        href="/events/new"
-        class="inline-flex items-center px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium no-underline hover:bg-green-700"
-      >
-        Create Event
-      </a>
+<%
+  const _upcomingEvents = typeof upcomingEvents !== 'undefined' ? upcomingEvents : [];
+  const _myRsvpEvents = typeof myRsvpEvents !== 'undefined' ? myRsvpEvents : [];
+%>
 
-      <a
-        href="/events/drafts"
-        class="inline-flex items-center px-4 py-2.5 rounded-lg bg-yellow-600 text-white font-medium no-underline hover:bg-yellow-700"
-      >
-        View Draft Events
-      </a>
-    <% } %>
-  </div>
-  <% if (session.authenticatedUser) { %>
-    <p class="text-slate-500 mt-2 mb-0">
-      Signed in as <strong class="text-slate-700"><%= session.authenticatedUser.displayName %></strong>
-      (<%= session.authenticatedUser.email %>, role:
-      <strong class="text-slate-700"><%= session.authenticatedUser.role %></strong>).
-    </p>
-  <% } %>
-</section>
+<div class="flex flex-col gap-6">
 
-<% if (pageError) { %>
-  <%- include("partials/error", { message: pageError }) %>
-<% } %>
-
-<section class="max-w-3xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
-  <div class="mb-4">
-    <h2 class="text-xl font-semibold mb-2">Getting Started</h2>
-    <p class="text-slate-500">
-      This starter application provides authentication and role-based authorization
-      out of the box. Here are some ideas for where to begin:
-    </p>
-  </div>
-
-  <ul class="list-disc pl-5 space-y-2 text-slate-700">
-    <li>Replace this page with your project's main dashboard or landing page.</li>
-    <li>Add new routes in <code class="bg-slate-100 px-1 rounded text-sm">src/app.ts</code> and protect them with
-      <code class="bg-slate-100 px-1 rounded text-sm">requireAuthenticated</code> or <code class="bg-slate-100 px-1 rounded text-sm">requireRole</code>.</li>
-    <li>Create new EJS views in <code class="bg-slate-100 px-1 rounded text-sm">src/views/</code>.</li>
-    <li>Add your own models, services, and controllers under <code class="bg-slate-100 px-1 rounded text-sm">src/</code>.</li>
-    <li>Use the Prisma schema in <code class="bg-slate-100 px-1 rounded text-sm">prisma/schema.prisma</code> to define your database tables.</li>
-  </ul>
-</section>
-
-<section class="max-w-3xl mt-5 p-6 border border-slate-200 rounded-2xl bg-white shadow-lg" x-data="{ open: false }">
-  <button
-    @click="open = !open"
-    class="w-full flex items-center justify-between text-left bg-transparent border-0 p-0 cursor-pointer"
-  >
-    <h2 class="text-xl font-semibold">Alpine.js Demo</h2>
-    <span class="text-slate-400 text-sm" x-text="open ? 'Hide' : 'Show'">Show</span>
-  </button>
-
-  <div x-show="open" x-transition class="mt-4">
-    <p class="text-slate-500 mb-3">
-      Alpine.js is included via CDN and ready to use. This collapsible section is
-      a quick demonstration. Use <code class="bg-slate-100 px-1 rounded text-sm">x-data</code>,
-      <code class="bg-slate-100 px-1 rounded text-sm">x-show</code>,
-      <code class="bg-slate-100 px-1 rounded text-sm">@click</code>, and other
-      Alpine directives directly in your EJS templates.
-    </p>
-    <div x-data="{ count: 0 }" class="flex items-center gap-3">
-      <button
-        @click="count++"
-        class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium cursor-pointer hover:bg-blue-700 text-sm"
-      >
-        Clicked: <span x-text="count">0</span>
-      </button>
-      <span class="text-sm text-slate-500">A simple Alpine.js counter</span>
+  <%# ── Hero header ── %>
+  <section class="p-6 md:p-8 border-2 border-pink-200 rounded-2xl bg-gradient-to-br from-pink-50 to-fuchsia-100 shadow-lg overflow-hidden">
+    <div class="flex items-end justify-between gap-4">
+      <div class="flex-1">
+        <h1 class="text-3xl font-extrabold text-fuchsia-700 mb-1">
+          Hey, <span class="text-pink-500"><%= session.authenticatedUser?.displayName %></span>! 🌸
+        </h1>
+        <p class="text-fuchsia-500 text-sm mb-4">Welcome back — here's what's coming up.</p>
+        <div class="flex gap-3 flex-wrap">
+          <a href="/events" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-fuchsia-600 text-white font-bold no-underline hover:bg-fuchsia-700 transition shadow-md text-sm">
+            Browse all events
+          </a>
+          <% if (session.authenticatedUser?.role === 'staff' || session.authenticatedUser?.role === 'admin') { %>
+            <a href="/events/new" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-white text-fuchsia-700 border-2 border-fuchsia-300 font-bold no-underline hover:bg-fuchsia-50 transition text-sm">
+              Create event
+            </a>
+            <a href="/events/drafts" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-white text-pink-600 border-2 border-pink-200 font-bold no-underline hover:bg-pink-50 transition text-sm">
+              View drafts
+            </a>
+          <% } %>
+        </div>
+      </div>
+      <img src="/kuromi2.png" alt="Kuromi" class="w-32 md:w-44 shrink-0 drop-shadow-md self-end hidden sm:block" />
     </div>
-  </div>
-</section>
+  </section>
+
+  <% if (pageError) { %>
+    <%- include("partials/error", { message: pageError }) %>
+  <% } %>
+
+  <%# ── My RSVPs ── only shown if user has any %>
+  <% if (_myRsvpEvents.length > 0) { %>
+  <section>
+    <h2 class="text-lg font-extrabold text-fuchsia-700 mb-3">Your upcoming RSVPs</h2>
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <% _myRsvpEvents.forEach(event => { %>
+        <%
+          const start = new Date(event.startDatetime);
+          const dateStr = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+          const timeStr = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        %>
+        <a href="/events/<%= event.id %>" class="no-underline group">
+          <article class="h-full p-4 border-2 border-fuchsia-100 rounded-2xl bg-white shadow-sm hover:shadow-md hover:border-fuchsia-300 transition overflow-hidden">
+            <div class="h-1 -mx-4 -mt-4 mb-3 bg-gradient-to-r from-fuchsia-400 via-pink-400 to-fuchsia-400"></div>
+            <p class="text-xs font-bold text-fuchsia-400 uppercase tracking-wide mb-1"><%= dateStr %> · <%= timeStr %></p>
+            <h3 class="font-extrabold text-slate-900 group-hover:text-fuchsia-700 transition text-sm leading-snug mb-1"><%= event.title %></h3>
+            <p class="text-xs text-slate-500 flex items-center gap-1">
+              <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+              <%= event.location %>
+            </p>
+          </article>
+        </a>
+      <% }) %>
+    </div>
+  </section>
+  <% } %>
+
+  <%# ── Upcoming events ── %>
+  <section>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-extrabold text-fuchsia-700">Upcoming events</h2>
+      <a href="/events" class="text-sm font-bold text-fuchsia-500 hover:underline no-underline">See all →</a>
+    </div>
+
+    <% if (_upcomingEvents.length === 0) { %>
+      <div class="flex items-center gap-4 p-6 border-2 border-pink-100 rounded-2xl bg-pink-50">
+        <img src="/kuromi1.png" alt="Kuromi" class="w-14 shrink-0" />
+        <div>
+          <p class="font-extrabold text-fuchsia-700">No upcoming events yet.</p>
+          <p class="text-fuchsia-400 text-sm">Check back soon, or create one yourself!</p>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <% _upcomingEvents.forEach(event => { %>
+          <%
+            const start = new Date(event.startDatetime);
+            const dateStr = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const timeStr = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const goingCount = event.attendees.filter(a => a.rsvpStatus === 'GOING').length;
+            const userId = session.authenticatedUser?.userId;
+            const userIsGoing = userId && event.attendees.some(a => a.userId === userId && a.rsvpStatus === 'GOING');
+          %>
+          <a href="/events/<%= event.id %>" class="no-underline group">
+            <article class="h-full p-4 border-2 border-pink-100 rounded-2xl bg-white shadow-sm hover:shadow-md hover:border-pink-300 transition overflow-hidden">
+              <div class="h-1 -mx-4 -mt-4 mb-3 bg-gradient-to-r from-pink-300 via-pink-400 to-pink-300"></div>
+              <div class="flex items-start justify-between gap-2 mb-1">
+                <p class="text-xs font-bold text-pink-400 uppercase tracking-wide"><%= dateStr %> · <%= timeStr %></p>
+                <% if (userIsGoing) { %>
+                  <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-fuchsia-100 text-fuchsia-700">Going ✓</span>
+                <% } %>
+              </div>
+              <h3 class="font-extrabold text-slate-900 group-hover:text-pink-600 transition text-sm leading-snug mb-1"><%= event.title %></h3>
+              <p class="text-xs text-slate-500 flex items-center gap-1 mb-2">
+                <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                <%= event.location %>
+              </p>
+              <p class="text-xs text-slate-400"><%= goingCount %> going<% if (event.capacity) { %> · <%= event.capacity - goingCount > 0 ? event.capacity - goingCount + ' spots left' : 'Full' %><% } %></p>
+            </article>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
+
+</div>

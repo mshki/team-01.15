@@ -5,40 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Project Starter</title>
     <style>[x-cloak] { display: none }</style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/response-targets.js"></script>
   </head>
-  <body class="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900 p-6">
+  <body class="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900 p-6 font-[Nunito,sans-serif]">
     <div class="max-w-5xl mx-auto">
       <nav class="flex items-center justify-between gap-3 mb-6 flex-wrap">
         <a
           href="<%= session?.authenticatedUser ? '/home' : '/login' %>"
-          class="inline-flex items-center gap-2.5 px-4 py-3 rounded-xl bg-white border border-slate-200 shadow-lg font-bold text-slate-900 no-underline"
+          class="inline-flex items-center gap-2.5 px-4 py-3 rounded-xl bg-white border border-slate-200 shadow-lg font-extrabold text-slate-900 no-underline hover:bg-slate-50 transition"
         >
-          <span class="w-2.5 h-2.5 rounded-full bg-gradient-to-b from-blue-400 to-blue-600"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-gradient-to-b from-fuchsia-400 to-fuchsia-600"></span>
           Project Starter
         </a>
         <div class="flex items-center gap-3 flex-wrap">
           <% if (session?.authenticatedUser) { %>
             <% if (session.authenticatedUser.role === "admin") { %>
-              <a href="/admin/users" class="text-blue-700 font-semibold no-underline hover:underline">Manage Users</a>
+              <a href="/admin/users" class="text-fuchsia-600 font-bold no-underline hover:underline">Manage Users</a>
             <% } %>
-            <span class="text-slate-500">
+            <span class="text-slate-500 text-sm">
               Signed in as <strong class="text-slate-700"><%= session.authenticatedUser.displayName %></strong>
               (<%= session.authenticatedUser.role %>)
             </span>
             <form method="post" action="/logout" class="m-0">
               <button
                 type="submit"
-                class="px-3.5 py-2 rounded-lg bg-white text-blue-700 border border-slate-200 cursor-pointer hover:bg-blue-50 text-sm font-medium"
+                class="px-3.5 py-2 rounded-xl bg-white text-slate-900 border border-slate-200 cursor-pointer hover:bg-slate-50 text-sm font-bold transition"
               >
                 Log out
               </button>
             </form>
           <% } else { %>
-            <a href="/login" class="text-blue-700 font-semibold no-underline hover:underline">Log in</a>
+            <a href="/login" class="text-fuchsia-600 font-bold no-underline hover:underline">Log in</a>
           <% } %>
         </div>
       </nav>
