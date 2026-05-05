@@ -25,27 +25,35 @@
     CONCLUDED: 'Concluded',
   };
 
-  const statusColors = {
-    PUBLISHED: 'bg-green-100 text-green-800',
-    DRAFT: 'bg-yellow-100 text-yellow-800',
-    CANCELLED: 'bg-red-100 text-red-800',
-    CONCLUDED: 'bg-slate-100 text-slate-600',
-  };
+  const inputClass =
+    'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 transition-colors duration-150 ' +
+    'focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10';
 
+  const primaryButtonClass =
+    'inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm ' +
+    'transition-all duration-200 ease-out hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30';
+
+  const secondaryButtonClass =
+    'inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ' +
+    'transition-all duration-200 ease-out hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200';
 %>
 
-<div id="edit-event-shell" 
-  hx-ext="response-targets" 
+<div
+  id="edit-event-shell"
+  hx-ext="response-targets"
   x-data="{ isDirty: false }"
-  @beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }">
-  <section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
-    <h1 class="text-3xl font-bold text-slate-900 mb-3">Edit Event</h1>
+  @beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }"
+>
+  <section class="mb-5 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-6 shadow-lg">
+    <h1 class="mb-3 text-3xl font-bold text-slate-900">Edit Event</h1>
     <p class="text-slate-600">Update the details for <strong><%= event.title %></strong>.</p>
   </section>
+
   <% if (typeof pageError !== 'undefined' && pageError) { %>
     <%- include("../../partials/error", { message: pageError }) %>
-<% } %>
-  <section class="max-w-3xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
+  <% } %>
+
+  <section class="max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-lg">
     <form
       class="grid gap-4"
       method="post"
@@ -53,77 +61,80 @@
       hx-target="#edit-event-shell"
       hx-target-400="#edit-event-shell"
       hx-swap="outerHTML"
+      @input="isDirty = true"
+      @change="isDirty = true"
+      @submit="isDirty = false"
     >
       <div>
-        <label for="name" class="block text-sm font-medium mb-1">Title</label>
+        <label for="name" class="mb-1 block text-sm font-medium">Title</label>
         <input
           id="name"
           name="name"
           type="text"
           value="<%= titleValue %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          class="<%= inputClass %>"
         />
       </div>
 
       <div>
-        <label for="description" class="block text-sm font-medium mb-1">Description</label>
+        <label for="description" class="mb-1 block text-sm font-medium">Description</label>
         <textarea
           id="description"
           name="description"
           rows="4"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          class="<%= inputClass %>"
         ><%= descriptionValue %></textarea>
       </div>
 
       <div>
-        <label for="location" class="block text-sm font-medium mb-1">Location</label>
+        <label for="location" class="mb-1 block text-sm font-medium">Location</label>
         <input
           id="location"
           name="location"
           type="text"
           value="<%= locationValue %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          class="<%= inputClass %>"
         />
       </div>
 
       <div>
-        <label for="category" class="block text-sm font-medium mb-1">
-          Category <span class="text-slate-400 font-normal">(optional)</span>
+        <label for="category" class="mb-1 block text-sm font-medium">
+          Category <span class="font-normal text-slate-400">(optional)</span>
         </label>
         <input
           id="category"
           name="category"
           type="text"
           value="<%= category %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          class="<%= inputClass %>"
         />
       </div>
 
       <div>
-        <label for="startDatetime" class="block text-sm font-medium mb-1">Start Date &amp; Time</label>
+        <label for="startDatetime" class="mb-1 block text-sm font-medium">Start Date &amp; Time</label>
         <input
           id="startDatetime"
           name="startDatetime"
           type="datetime-local"
           value="<%= startValue %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          class="<%= inputClass %>"
         />
       </div>
 
       <div>
-        <label for="endDatetime" class="block text-sm font-medium mb-1">End Date &amp; Time</label>
+        <label for="endDatetime" class="mb-1 block text-sm font-medium">End Date &amp; Time</label>
         <input
           id="endDatetime"
           name="endDatetime"
           type="datetime-local"
           value="<%= endValue %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          class="<%= inputClass %>"
         />
       </div>
 
       <div>
-        <label for="capacity" class="block text-sm font-medium mb-1">
-          Capacity <span class="text-slate-400 font-normal">(optional)</span>
+        <label for="capacity" class="mb-1 block text-sm font-medium">
+          Capacity <span class="font-normal text-slate-400">(optional)</span>
         </label>
         <input
           id="capacity"
@@ -131,16 +142,16 @@
           type="number"
           min="1"
           value="<%= capacityValue %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          class="<%= inputClass %>"
         />
       </div>
 
       <div>
-        <label for="status" class="block text-sm font-medium mb-1">Status</label>
+        <label for="status" class="mb-1 block text-sm font-medium">Status</label>
         <select
           id="status"
           name="status"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          class="<%= inputClass %>"
         >
           <% eventStatuses.forEach((s) => { %>
             <option value="<%= s %>" <%= status === s ? 'selected' : '' %>>
@@ -149,20 +160,16 @@
           <% }) %>
         </select>
       </div>
-  
 
-      <div class="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          class="px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium cursor-pointer hover:bg-blue-700"
-        >
+      <div class="flex flex-col gap-3 pt-2 sm:flex-row">
+        <button type="submit" class="<%= primaryButtonClass %>">
           Save Changes
         </button>
 
         <a
           href="/events/<%= event.id %>"
           @click="if (isDirty && !confirm('You have unsaved changes. Are you sure you want to discard them?')) $event.preventDefault()"
-          class="px-4 py-2.5 rounded-lg bg-white text-slate-700 border border-slate-300 font-medium hover:bg-slate-50 no-underline"
+          class="<%= secondaryButtonClass %> no-underline"
         >
           Cancel
         </a>
