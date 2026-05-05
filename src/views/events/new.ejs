@@ -14,11 +14,11 @@
     </div>
   </section>
 
-  <div id="create-event-form-wrapper">
-    <%- include("./partials/create-form", {
+    <%- include("./partials/event-form-field", {
+      isEditMode: false,
       pageError: typeof pageError !== 'undefined' ? pageError : null,
-      formValues: typeof formValues !== 'undefined' ? formValues : null
+      values: typeof formValues !== 'undefined' ? formValues : null
     }) %>
-  </div>
+
 
 </div>
