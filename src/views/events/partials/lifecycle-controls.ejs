@@ -23,8 +23,23 @@
     <%- include("../../partials/error", { message: pageError }) %>
   <% } %>
 
-  <div id="status-badge-region" class="flex items-center gap-2 flex-wrap">
-    <span class="inline-block px-3 py-1 rounded-full text-sm font-medium <%= statusColors[event.status] %>">
+  <div
+    id="status-badge-region"
+    class="flex items-center gap-2 flex-wrap"
+    x-data="{ pulse: false }"
+    x-init="
+      document.body.addEventListener('htmx:afterSwap', (e) => {
+        if ($el.contains(e.target) || e.target.id === 'lifecycle-region') {
+          pulse = true;
+          setTimeout(() => pulse = false, 450);
+        }
+      })
+    "
+  >
+    <span
+      class="inline-block px-3 py-1 rounded-full text-sm font-medium transition-transform duration-300 <%= statusColors[event.status] %>"
+      :class="pulse ? 'scale-105 ring-2 ring-slate-300' : ''"
+    >
       <%= statusLabels[event.status] %>
     </span>
   </div>

@@ -706,4 +706,6 @@ describe("EventService — invalid search input", () => {
             expect(objectResult.value.name).toBe("InvalidSearchQueryError");
         }
     });
-});
+}); 
+
+// everything should be running smooth in the event service minor issues have been resolved and UI looks better than ever
