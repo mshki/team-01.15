@@ -140,12 +140,20 @@ class EventController implements IEventController {
             const log = httpStatus === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Create event failed: ${result.value.message}`);
 
-            res.status(isHtmx ? 200 : httpStatus).render("events/new", {
-                session,
-                pageError: result.value.message,
-                formValues: { name, description, location, category, status, startDatetime, endDatetime, capacity },
-                layout: isHtmx ? false : "layouts/base",
-            });
+            if (isHtmx) {
+                res.status(200).render("events/partials/create-form", {
+                    session,
+                    pageError: result.value.message,
+                    formValues: { name, description, location, category, status, startDatetime, endDatetime, capacity },
+                    layout: false,
+                });
+            } else {
+                res.status(httpStatus).render("events/new", {
+                    session,
+                    pageError: result.value.message,
+                    formValues: { name, description, location, category, status, startDatetime, endDatetime, capacity },
+                });
+            }
             return;
         }
 

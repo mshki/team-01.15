@@ -1,86 +1,128 @@
-<section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
-  <h1 class="text-3xl font-bold text-slate-900 mb-3">Draft Events</h1>
-  <p class="text-slate-500">
-    View and manage draft events before publishing them.
-  </p>
-</section>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" />
 
-<% if (pageError) { %>
-  <%- include("../partials/error", { message: pageError }) %>
-<% } %>
+<div class="font-[Nunito,sans-serif] flex flex-col gap-5">
 
-<section class="grid gap-4">
-  <% if (!events || events.length === 0) { %>
-    <div class="p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
-      <p class="text-slate-500 mb-0">No draft events found.</p>
+  <%# ── Header card — light so both characters are visible ── %>
+  <section class="p-6 border-2 border-yellow-200 rounded-2xl bg-gradient-to-br from-yellow-50 to-zinc-100 shadow-lg overflow-hidden">
+    <div class="flex items-end justify-between gap-4">
+      <div class="flex-1">
+        <h1 class="text-3xl font-extrabold text-zinc-900 mb-1">Draft Events 😒</h1>
+        <p class="text-zinc-600 text-sm">View and manage your drafts before they're ready to publish.</p>
+      </div>
+      <%# Both characters side by side in the header %>
+      <div class="flex items-end gap-1 shrink-0 hidden sm:flex">
+        <img src="/badtzmaru2.png" alt="Badtz-Maru"
+          class="w-24 md:w-32 drop-shadow-md self-end" />
+        <img src="/badtzmaru1.png" alt="Badtz-Maru"
+          class="w-20 md:w-28 drop-shadow-md self-end" />
+      </div>
     </div>
+  </section>
+
+  <% if (pageError) { %>
+    <%- include("../partials/error", { message: pageError }) %>
   <% } %>
 
-  <% events.forEach((event) => { %>
-    <article class="p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
-      <div class="flex items-start justify-between gap-4 flex-wrap">
+  <%# ── Draft list ── %>
+  <div class="grid gap-4">
+    <% if (!events || events.length === 0) { %>
+      <div class="flex items-center gap-5 p-6 border-2 border-yellow-100 rounded-2xl bg-yellow-50 shadow-sm">
+        <img src="/badtzmaru1.png" alt="Badtz-Maru" class="w-14 shrink-0 drop-shadow-sm" />
         <div>
-          <h2 class="text-xl font-semibold text-slate-900 mb-1"><%= event.title %></h2>
-          <p class="text-slate-500 text-sm mb-2"><%= event.location %></p>
-
-          <% if (event.category) { %>
-            <p class="text-sm text-slate-500 mb-2">Category: <%= event.category %></p>
-          <% } %>
-
-          <p class="text-slate-700 mb-3"><%= event.description %></p>
-
-          <span class="inline-block px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-            Draft
-          </span>
-        </div>
-
-        <div class="flex flex-col gap-2">
-          <a
-            href="/events/<%= event.id %>"
-            class="inline-block px-4 py-2.5 rounded-lg bg-white text-slate-700 border border-slate-300 font-medium hover:bg-slate-50 no-underline text-sm"
-          >
-            View
-          </a>
-
-          <a
-            href="/events/<%= event.id %>/edit"
-            class="inline-block px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 no-underline text-sm"
-          >
-            Edit
-          </a>
-
-          <form
-            method="post"
-            action="/events/<%= event.id %>/publish"
-            hx-post="/events/<%= event.id %>/publish"
-            hx-target="closest article"
-            hx-swap="delete"
-          >
-            <button
-              type="submit"
-              class="w-full px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 cursor-pointer text-sm"
-            >
-              Publish
-            </button>
-          </form>
-
-          <form
-            method="post"
-            action="/events/<%= event.id %>/delete"
-            hx-post="/events/<%= event.id %>/delete"
-            hx-target="closest article"
-            hx-swap="delete"
-          >
-            <button
-              type="submit"
-              class="w-full px-4 py-2.5 rounded-lg bg-white text-red-700 border border-red-300 font-medium hover:bg-red-50 cursor-pointer text-sm"
-              onclick="return confirm('Delete this draft? This cannot be undone.')"
-            >
-              Delete Draft
-            </button>
-          </form>
+          <p class="text-zinc-800 font-extrabold text-base">Nothing here yet.</p>
+          <p class="text-zinc-500 text-sm">Create an event and save it as a draft to see it here.</p>
         </div>
       </div>
-    </article>
-  <% }) %>
-</section>
+    <% } %>
+
+    <% events.forEach((event) => { %>
+      <article class="rounded-2xl border-2 border-zinc-200 bg-white shadow-md overflow-hidden">
+
+        <%# Coloured top stripe — gives each card a Badtz-Maru accent bar %>
+        <div class="h-2 bg-gradient-to-r from-zinc-900 via-yellow-400 to-zinc-900"></div>
+
+        <div class="p-6 flex items-start justify-between gap-6 flex-wrap">
+
+          <%# Left: event info %>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-2">
+              <h2 class="text-xl font-extrabold text-zinc-900"><%= event.title %></h2>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800 border border-yellow-300">
+                Draft
+              </span>
+            </div>
+
+            <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-zinc-500 mb-3">
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                  <circle cx="12" cy="9" r="2.5"/>
+                </svg>
+                <%= event.location %>
+              </span>
+              <% if (event.category) { %>
+                <span class="flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M4 6h16M4 10h16M4 14h8"/>
+                  </svg>
+                  <%= event.category %>
+                </span>
+              <% } %>
+            </div>
+
+            <p class="text-zinc-600 text-sm leading-relaxed line-clamp-2"><%= event.description %></p>
+          </div>
+
+          <%# Right: action buttons %>
+          <div class="flex flex-row md:flex-col gap-2 shrink-0 flex-wrap">
+            <a
+              href="/events/<%= event.id %>"
+              class="px-4 py-2 rounded-xl bg-zinc-100 text-zinc-700 border-2 border-zinc-200 font-bold hover:bg-zinc-200 no-underline text-sm transition text-center"
+            >
+              View
+            </a>
+
+            <a
+              href="/events/<%= event.id %>/edit"
+              class="px-4 py-2 rounded-xl bg-yellow-400 text-zinc-900 font-bold hover:bg-yellow-300 no-underline text-sm transition text-center shadow-sm"
+            >
+              Edit
+            </a>
+
+            <form
+              method="post"
+              action="/events/<%= event.id %>/publish"
+              hx-post="/events/<%= event.id %>/publish"
+              hx-target="closest article"
+              hx-swap="delete"
+            >
+              <button
+                type="submit"
+                class="w-full px-4 py-2 rounded-xl bg-zinc-900 text-yellow-400 font-bold hover:bg-zinc-700 cursor-pointer text-sm transition shadow-sm"
+              >
+                Publish
+              </button>
+            </form>
+
+            <form
+              method="post"
+              action="/events/<%= event.id %>/delete"
+              hx-post="/events/<%= event.id %>/delete"
+              hx-target="closest article"
+              hx-swap="delete"
+            >
+              <button
+                type="submit"
+                class="w-full px-4 py-2 rounded-xl bg-white text-red-600 border-2 border-red-200 font-bold hover:bg-red-50 cursor-pointer text-sm transition"
+                onclick="return confirm('Delete this draft? This cannot be undone.')"
+              >
+                Delete
+              </button>
+            </form>
+          </div>
+        </div>
+      </article>
+    <% }) %>
+  </div>
+
+</div>
