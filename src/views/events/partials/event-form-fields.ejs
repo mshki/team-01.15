@@ -1,0 +1,138 @@
+<%
+  const isEdit = typeof isEditMode !== 'undefined' && isEditMode;
+  
+  const form = (typeof values !== 'undefined' && values) ? values : 
+  (typeof formValues !== 'undefined' && formValues) ? formValues :
+  (typeof event !== 'undefined' ? event : {});
+  
+  function toDatetimeLocal(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value; // Return as-is if it's already a string or invalid
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  const titleValue = form.name ?? form.title ?? '';
+  const descriptionValue = form.description ?? '';
+  const locationValue = form.location ?? '';
+  const categoryValue = form.category ?? '';
+  const capacityValue = form.capacity ?? '';
+  const startValue = toDatetimeLocal(form.startDatetime);
+  const endValue = toDatetimeLocal(form.endDatetime);
+  const statusValue = form.status ?? 'DRAFT';
+
+  const inputClass = 'w-full px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition';
+  const labelClass = 'text-sm font-semibold text-slate-700';
+%>
+
+<div 
+  id="event-form-container"
+  hx-ext="response-targets"
+  x-data="{ 
+    isDirty: false, 
+    descCount: <%= descriptionValue.length %>, 
+    maxDesc: 500 
+  }"
+  @beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }"
+>
+<% if (typeof pageError !== 'undefined' && pageError) { %>
+    <%- include("../../partials/error", { message: pageError }) %>
+  <% } %>
+
+  <section class="p-6 md:p-8 border border-slate-200 rounded-2xl bg-white shadow-lg">
+    <form
+      class="grid gap-6"
+      hx-post="<%= isEdit ? `/events/${event.id}/edit` : '/events' %>"
+      hx-target="#event-form-container"
+      hx-target-400="#event-form-container"
+      hx-swap="outerHTML"
+      @input="isDirty = true"
+      @change="isDirty = true"
+      @submit="isDirty = false"
+    >
+      <%# Title %>
+      <div class="grid gap-1.5">
+        <label for="name" class="<%= labelClass %>">
+          Event Name <span class="text-red-500">*</span>
+        </label>
+        <input
+          id="name" name="name" type="text" required
+          placeholder="e.g. Spring Hackathon 2026"
+          value="<%= titleValue %>"
+          class="<%= inputClass %>"
+        />
+      </div>
+
+      <%# Description %>
+      <div class="grid gap-1.5">
+        <div class="flex items-baseline justify-between gap-2">
+          <label for="description" class="<%= labelClass %>">Description</label>
+          <span class="text-xs tabular-nums" :class="descCount > maxDesc ? 'text-red-500' : 'text-slate-400'">
+            <span x-text="descCount"></span> / <span x-text="maxDesc"></span>
+          </span>
+        </div>
+        <textarea
+          id="description" name="description" rows="4" maxlength="500"
+          placeholder="Describe your event..."
+          x-on:input="descCount = $event.target.value.length"
+          class="<%= inputClass %> resize-y"
+        ><%= descriptionValue %></textarea>
+      </div>
+
+      <%# Location & Category %>
+      <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-1.5">
+          <label for="location" class="<%= labelClass %>">Location</label>
+          <input id="location" name="location" type="text" placeholder="e.g. Room 101, Building A" value="<%= locationValue %>" class="<%= inputClass %>" />
+        </div>
+        <div class="grid gap-1.5">
+          <label for="category" class="<%= labelClass %>">Category</label>
+          <input id="category" name="category" type="text" placeholder="e.g. Workshop, Social, Tech Talk" value="<%= categoryValue %>" class="<%= inputClass %>" />
+        </div>
+      </div>
+
+      <%# Dates %>
+      <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-1.5">
+          <label for="startDatetime" class="<%= labelClass %>">Start Date & Time <span class="text-red-500">*</span></label>
+          <input id="startDatetime" name="startDatetime" type="datetime-local" required value="<%= startValue %>" class="<%= inputClass %>" />
+        </div>
+        <div class="grid gap-1.5">
+          <label for="endDatetime" class="<%= labelClass %>">End Date & Time <span class="text-red-500">*</span></label>
+          <input id="endDatetime" name="endDatetime" type="datetime-local" required value="<%= endValue %>" class="<%= inputClass %>" />
+        </div>
+      </div>
+
+      <%# Capacity & Status %>
+      <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-1.5">
+          <label for="capacity" class="<%= labelClass %>">Capacity</label>
+          <input id="capacity" name="capacity" type="number" min="1" value="<%= capacityValue %>" class="<%= inputClass %>" />
+        </div>
+        <div class="grid gap-1.5">
+          <label for="status" class="<%= labelClass %>">Status</label>
+          <select id="status" name="status" class="<%= inputClass %> appearance-none cursor-pointer">
+            <% ['DRAFT', 'PUBLISHED', 'CANCELLED', 'CONCLUDED'].forEach(s => { %>
+              <option value="<%= s %>" <%= statusValue === s ? 'selected' : '' %>><%= s.charAt(0) + s.slice(1).toLowerCase() %></option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+
+      <hr class="border-slate-100" />
+
+      <%# Actions %>
+      <div class="flex items-center justify-between gap-3">
+        <a href="isEdit ? /events/<%= event.id %>: /events%>"
+            @click="if (isEdit && isDirty && !confirm('You have unsaved changes. Are you sure you want to discard them?')) $event.preventDefault()"
+           class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-medium text-sm hover:bg-slate-50 transition no-underline">
+          Cancel
+        </a>
+        <button type="submit" class="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition shadow-sm">
+          <%= isEdit ? 'Save Changes' : 'Create Event' %>
+        </button>
+      </div>
+    </form>
+  </section>
+</div>

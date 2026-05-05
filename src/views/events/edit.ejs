@@ -1,5 +1,11 @@
-<%- include("./partials/edit-form", {
-  event,
-  pageError: typeof pageError !== "undefined" ? pageError : "",
-  values: typeof values !== "undefined" ? values : null
+<section class="mb-5 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-6 shadow-lg">
+  <h1 class="mb-3 text-3xl font-bold text-slate-900">Edit Event</h1>
+  <p class="text-slate-600">Update the details for <strong><%= event.title %></strong>.</p>
+</section>
+
+<%- include("./partials/event-form-fields", { 
+  isEditMode: true,
+  event: event,
+  pageError: typeof pageError !== 'undefined' ? pageError : null,
+  values: typeof values !== 'undefined' ? values : null 
 }) %>
