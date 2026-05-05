@@ -3,8 +3,6 @@ import { IEventService } from "../service/EventService";
 import { ILoggingService } from "../service/LoggingService";
 import { IAppBrowserSession, IAuthenticatedUserSession } from "../session/AppSession";
 import { EventError, RSVPError } from "../lib/errors";
-import { IApp } from "../contracts";
-import { stat } from "node:fs";
 import { EventStatus } from "../types/EventTypes";
 
 export interface IEventController {
@@ -141,8 +139,9 @@ class EventController implements IEventController {
             log.call(this.logger, `Create event failed: ${result.value.message}`);
 
             if (isHtmx) {
-                res.status(200).render("events/partials/create-form", {
+                res.status(200).render("events/partials/event-form-field", {
                     session,
+                    isEditMode: false,
                     pageError: result.value.message,
                     formValues: { name, description, location, category, status, startDatetime, endDatetime, capacity },
                     layout: false,
@@ -323,8 +322,10 @@ class EventController implements IEventController {
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Edit event failed: ${result.value.message}`);
         
-            res.status(status).render("events/partials/edit-form", {
+            res.status(status).render("events/partials/event-form-field", {
+                session,
                 event: { id, title: name },
+                isEditMode: true,
                 pageError: result.value.message,
                 values: {
                     title: name,
@@ -336,7 +337,6 @@ class EventController implements IEventController {
                     endDatetime,
                     capacity,
                 },
-                session,
                 layout: false,
             });
             return;

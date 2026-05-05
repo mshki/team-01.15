@@ -1,5 +1,24 @@
-<%- include("./partials/edit-form", {
-  event,
-  pageError: typeof pageError !== "undefined" ? pageError : "",
-  values: typeof values !== "undefined" ? values : null
-}) %>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" />
+
+<div class="font-[Nunito,sans-serif] flex flex-col gap-5">
+
+  <%# ── Header card ── %>
+  <section class="p-6 border-2 border-lime-200 rounded-2xl bg-gradient-to-br from-lime-50 to-green-100 shadow-lg overflow-hidden">
+    <div class="flex items-end justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-extrabold text-green-900 mb-1">Edit Event ☁️🐶</h1>
+        <p class="text-slate-600">Update the details for <strong><%= event.title %></strong>.</p>
+      </div>
+      <img src="/cinnamonroll2.png" alt="Cinnamonroll"
+        class="w-28 md:w-40 shrink-0 drop-shadow-md self-end hidden sm:block" />
+    </div>
+  </section>
+
+  <%- include("./partials/event-form-field", { 
+      isEditMode: true,
+      event: event,
+      pageError: typeof pageError !== 'undefined' ? pageError : null,
+      values: typeof values !== 'undefined' ? values : null 
+    }) %>
+
+</div>
