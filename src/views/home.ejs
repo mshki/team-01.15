@@ -1,89 +1,101 @@
-<section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
-  <h1 class="text-3xl font-bold text-slate-900 mb-3">Welcome to Project Starter</h1>
-  <p class="text-slate-500">
-    You are signed in and ready to build. This placeholder page is where your
-    project's main content will go.
-  </p>
-  <div class="flex gap-3 flex-wrap">
-    <a
-      href="/events"
-      class="inline-flex items-center px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium no-underline hover:bg-blue-700"
-    >
-      Browse Events
-    </a>
-    <% if (session.authenticatedUser && (session.authenticatedUser.role === 'staff' || session.authenticatedUser.role === 'admin')) { %>
-      <a
-        href="/events/new"
-        class="inline-flex items-center px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium no-underline hover:bg-green-700"
-      >
-        Create Event
-      </a>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" />
 
-      <a
-        href="/events/drafts"
-        class="inline-flex items-center px-4 py-2.5 rounded-lg bg-yellow-600 text-white font-medium no-underline hover:bg-yellow-700"
-      >
-        View Draft Events
-      </a>
-    <% } %>
-  </div>
-  <% if (session.authenticatedUser) { %>
-    <p class="text-slate-500 mt-2 mb-0">
-      Signed in as <strong class="text-slate-700"><%= session.authenticatedUser.displayName %></strong>
-      (<%= session.authenticatedUser.email %>, role:
-      <strong class="text-slate-700"><%= session.authenticatedUser.role %></strong>).
-    </p>
-  <% } %>
-</section>
+<div class="font-[Nunito,sans-serif] flex flex-col gap-5">
 
-<% if (pageError) { %>
-  <%- include("partials/error", { message: pageError }) %>
-<% } %>
-
-<section class="max-w-3xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
-  <div class="mb-4">
-    <h2 class="text-xl font-semibold mb-2">Getting Started</h2>
-    <p class="text-slate-500">
-      This starter application provides authentication and role-based authorization
-      out of the box. Here are some ideas for where to begin:
-    </p>
-  </div>
-
-  <ul class="list-disc pl-5 space-y-2 text-slate-700">
-    <li>Replace this page with your project's main dashboard or landing page.</li>
-    <li>Add new routes in <code class="bg-slate-100 px-1 rounded text-sm">src/app.ts</code> and protect them with
-      <code class="bg-slate-100 px-1 rounded text-sm">requireAuthenticated</code> or <code class="bg-slate-100 px-1 rounded text-sm">requireRole</code>.</li>
-    <li>Create new EJS views in <code class="bg-slate-100 px-1 rounded text-sm">src/views/</code>.</li>
-    <li>Add your own models, services, and controllers under <code class="bg-slate-100 px-1 rounded text-sm">src/</code>.</li>
-    <li>Use the Prisma schema in <code class="bg-slate-100 px-1 rounded text-sm">prisma/schema.prisma</code> to define your database tables.</li>
-  </ul>
-</section>
-
-<section class="max-w-3xl mt-5 p-6 border border-slate-200 rounded-2xl bg-white shadow-lg" x-data="{ open: false }">
-  <button
-    @click="open = !open"
-    class="w-full flex items-center justify-between text-left bg-transparent border-0 p-0 cursor-pointer"
-  >
-    <h2 class="text-xl font-semibold">Alpine.js Demo</h2>
-    <span class="text-slate-400 text-sm" x-text="open ? 'Hide' : 'Show'">Show</span>
-  </button>
-
-  <div x-show="open" x-transition class="mt-4">
-    <p class="text-slate-500 mb-3">
-      Alpine.js is included via CDN and ready to use. This collapsible section is
-      a quick demonstration. Use <code class="bg-slate-100 px-1 rounded text-sm">x-data</code>,
-      <code class="bg-slate-100 px-1 rounded text-sm">x-show</code>,
-      <code class="bg-slate-100 px-1 rounded text-sm">@click</code>, and other
-      Alpine directives directly in your EJS templates.
-    </p>
-    <div x-data="{ count: 0 }" class="flex items-center gap-3">
-      <button
-        @click="count++"
-        class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium cursor-pointer hover:bg-blue-700 text-sm"
-      >
-        Clicked: <span x-text="count">0</span>
-      </button>
-      <span class="text-sm text-slate-500">A simple Alpine.js counter</span>
+  <%# ── Header card ── %>
+  <section class="p-6 md:p-8 border-2 border-pink-200 rounded-2xl bg-gradient-to-br from-pink-50 to-fuchsia-100 shadow-lg overflow-hidden">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <div class="flex-1">
+        <h1 class="text-3xl font-extrabold text-fuchsia-700 mb-1">
+          Welcome back
+          <% if (session.authenticatedUser) { %>
+            , <span class="text-pink-500"><%= session.authenticatedUser.displayName %></span>
+          <% } %>! 🖤
+        </h1>
+        <p class="text-fuchsia-400 text-sm mb-4">
+          Signed in as <span class="text-fuchsia-600 font-semibold"><%= session.authenticatedUser?.email %></span>
+          · <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-fuchsia-200 text-fuchsia-700 text-xs font-bold"><%= session.authenticatedUser?.role %></span>
+        </p>
+        <div class="flex gap-3 flex-wrap">
+          <a
+            href="/events"
+            class="inline-flex items-center px-4 py-2.5 rounded-xl bg-fuchsia-600 text-white font-bold no-underline hover:bg-fuchsia-700 transition shadow-md"
+          >
+            Browse Events
+          </a>
+          <% if (session.authenticatedUser && (session.authenticatedUser.role === 'staff' || session.authenticatedUser.role === 'admin')) { %>
+            <a
+              href="/events/new"
+              class="inline-flex items-center px-4 py-2.5 rounded-xl bg-white text-fuchsia-700 border-2 border-fuchsia-300 font-bold no-underline hover:bg-fuchsia-50 transition"
+            >
+              Create Event
+            </a>
+            <a
+              href="/events/drafts"
+              class="inline-flex items-center px-4 py-2.5 rounded-xl bg-white text-pink-600 border-2 border-pink-200 font-bold no-underline hover:bg-pink-50 transition"
+            >
+              View Drafts
+            </a>
+          <% } %>
+        </div>
+      </div>
+      <%# Kuromi in the header — always visible, never overlaps text %>
+      <img src="/kuromi2.png" alt="Kuromi"
+        class="w-32 md:w-44 shrink-0 drop-shadow-md self-end" />
     </div>
-  </div>
-</section>
+  </section>
+
+  <% if (pageError) { %>
+    <%- include("partials/error", { message: pageError }) %>
+  <% } %>
+
+  <%# ── Getting Started card ── %>
+  <section class="p-6 border-2 border-pink-100 rounded-2xl bg-white shadow-md">
+    <div class="flex items-start justify-between gap-4">
+      <div class="flex-1">
+        <h2 class="text-lg font-extrabold text-fuchsia-700 mb-1">Getting Started</h2>
+        <p class="text-slate-500 text-sm mb-4">
+          This starter gives you auth and role-based access out of the box. Some ideas:
+        </p>
+        <ul class="flex flex-col gap-2 text-sm text-slate-700">
+          <li class="flex gap-2"><span class="text-fuchsia-400 font-bold shrink-0">✦</span> Replace this page with your project's main dashboard or landing page.</li>
+          <li class="flex gap-2"><span class="text-fuchsia-400 font-bold shrink-0">✦</span> Add new routes in <code class="bg-fuchsia-50 text-fuchsia-700 px-1.5 py-0.5 rounded-lg text-xs border border-fuchsia-200">src/app.ts</code> and protect them with <code class="bg-fuchsia-50 text-fuchsia-700 px-1.5 py-0.5 rounded-lg text-xs border border-fuchsia-200">requireAuthenticated</code>.</li>
+          <li class="flex gap-2"><span class="text-fuchsia-400 font-bold shrink-0">✦</span> Create new EJS views in <code class="bg-fuchsia-50 text-fuchsia-700 px-1.5 py-0.5 rounded-lg text-xs border border-fuchsia-200">src/views/</code>.</li>
+          <li class="flex gap-2"><span class="text-fuchsia-400 font-bold shrink-0">✦</span> Add your own models, services, and controllers under <code class="bg-fuchsia-50 text-fuchsia-700 px-1.5 py-0.5 rounded-lg text-xs border border-fuchsia-200">src/</code>.</li>
+          <li class="flex gap-2"><span class="text-fuchsia-400 font-bold shrink-0">✦</span> Use the Prisma schema in <code class="bg-fuchsia-50 text-fuchsia-700 px-1.5 py-0.5 rounded-lg text-xs border border-fuchsia-200">prisma/schema.prisma</code> to define your database tables.</li>
+        </ul>
+      </div>
+      <img src="/kuromi1.png" alt="Kuromi"
+        class="w-24 md:w-32 shrink-0 drop-shadow-md self-end hidden sm:block" />
+    </div>
+  </section>
+
+  <%# ── Alpine.js demo card ── %>
+  <section class="p-6 border-2 border-pink-100 rounded-2xl bg-white shadow-md" x-data="{ open: false }">
+    <button
+      @click="open = !open"
+      class="w-full flex items-center justify-between text-left bg-transparent border-0 p-0 cursor-pointer"
+    >
+      <h2 class="text-lg font-extrabold text-fuchsia-700">Alpine.js Demo</h2>
+      <span class="text-fuchsia-400 text-sm font-semibold" x-text="open ? 'Hide ▲' : 'Show ▼'">Show ▼</span>
+    </button>
+
+    <div x-show="open" x-transition class="mt-4">
+      <p class="text-slate-500 text-sm mb-4">
+        Alpine.js is included via CDN. Use <code class="bg-fuchsia-50 text-fuchsia-700 px-1.5 py-0.5 rounded-lg text-xs border border-fuchsia-200">x-data</code>,
+        <code class="bg-fuchsia-50 text-fuchsia-700 px-1.5 py-0.5 rounded-lg text-xs border border-fuchsia-200">x-show</code>,
+        <code class="bg-fuchsia-50 text-fuchsia-700 px-1.5 py-0.5 rounded-lg text-xs border border-fuchsia-200">@click</code> directly in your EJS templates.
+      </p>
+      <div x-data="{ count: 0 }" class="flex items-center gap-3">
+        <button
+          @click="count++"
+          class="px-4 py-2 rounded-xl bg-fuchsia-600 text-white font-bold cursor-pointer hover:bg-fuchsia-700 transition text-sm"
+        >
+          Clicked: <span x-text="count">0</span>
+        </button>
+        <span class="text-sm text-slate-400">A simple Alpine.js counter</span>
+      </div>
+    </div>
+  </section>
+
+</div>
