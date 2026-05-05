@@ -1,0 +1,170 @@
+<% if (typeof pageError !== 'undefined' && pageError) { %>
+  <%- include("../../partials/error", { message: pageError }) %>
+<% } %>
+
+<section class="p-6 md:p-8 border-2 border-lime-100 rounded-2xl bg-white shadow-md">
+  <div class="flex items-start justify-between gap-4">
+    <form
+      class="grid gap-6 flex-1"
+      hx-post="/events"
+      hx-target="#create-event-form-wrapper"
+      hx-swap="innerHTML"
+      hx-push-url="false"
+    >
+
+      <%# Name %>
+      <div class="grid gap-1.5">
+        <label for="name" class="text-sm font-bold text-green-900">
+          Event Name <span class="text-red-400">*</span>
+        </label>
+        <input
+          id="name"
+          name="name"
+          type="text"
+          required
+          placeholder="e.g. Spring Hackathon 2026"
+          value="<%= formValues ? formValues.name : '' %>"
+          class="w-full px-3.5 py-2.5 border-2 border-lime-200 rounded-xl bg-lime-50 text-slate-800 placeholder:text-green-600 focus:outline-none focus:ring-2 focus:ring-lime-300 focus:border-lime-400 focus:bg-white transition"
+        />
+      </div>
+
+      <%# Description with Alpine.js character counter %>
+      <div
+        class="grid gap-1.5"
+        x-data="{ count: <%= formValues && formValues.description ? formValues.description.length : 0 %>, max: 500 }"
+      >
+        <div class="flex items-baseline justify-between gap-2">
+          <label for="description" class="text-sm font-bold text-green-900">Description</label>
+          <span
+            class="text-xs tabular-nums font-semibold"
+            :class="count > max ? 'text-red-500' : count >= max * 0.9 ? 'text-amber-600' : 'text-green-900'"
+          >
+            <span x-text="count"></span> / <span x-text="max"></span>
+          </span>
+        </div>
+        <textarea
+          id="description"
+          name="description"
+          rows="4"
+          maxlength="500"
+          placeholder="Describe your event — what to expect, who should come, what to bring…"
+          x-on:input="count = $event.target.value.length"
+          class="w-full px-3.5 py-2.5 border-2 border-lime-200 rounded-xl bg-lime-50 text-slate-800 placeholder:text-green-600 resize-y focus:outline-none focus:ring-2 focus:ring-lime-300 focus:border-lime-400 focus:bg-white transition"
+        ><%= formValues ? formValues.description : '' %></textarea>
+        <p class="text-xs text-green-800">Maximum 500 characters.</p>
+      </div>
+
+      <%# Location %>
+      <div class="grid gap-1.5">
+        <label for="location" class="text-sm font-bold text-green-900">Location</label>
+        <input
+          id="location"
+          name="location"
+          type="text"
+          placeholder="e.g. Room 101, Building A"
+          value="<%= formValues ? formValues.location : '' %>"
+          class="w-full px-3.5 py-2.5 border-2 border-lime-200 rounded-xl bg-lime-50 text-slate-800 placeholder:text-green-600 focus:outline-none focus:ring-2 focus:ring-lime-300 focus:border-lime-400 focus:bg-white transition"
+        />
+      </div>
+
+      <%# Category %>
+      <div class="grid gap-1.5">
+        <label for="category" class="text-sm font-bold text-green-900">
+          Category <span class="text-green-800 font-normal">(optional)</span>
+        </label>
+        <input
+          id="category"
+          name="category"
+          type="text"
+          placeholder="e.g. Workshop, Social, Tech Talk"
+          value="<%= formValues && formValues.category ? formValues.category : '' %>"
+          class="w-full px-3.5 py-2.5 border-2 border-lime-200 rounded-xl bg-lime-50 text-slate-800 placeholder:text-green-600 focus:outline-none focus:ring-2 focus:ring-lime-300 focus:border-lime-400 focus:bg-white transition"
+        />
+      </div>
+
+      <%# Date & Time row %>
+      <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-1.5">
+          <label for="startDatetime" class="text-sm font-bold text-green-900">
+            Start Date &amp; Time <span class="text-red-400">*</span>
+          </label>
+          <input
+            id="startDatetime"
+            name="startDatetime"
+            type="datetime-local"
+            required
+            value="<%= formValues ? formValues.startDatetime : '' %>"
+            class="w-full px-3.5 py-2.5 border-2 border-lime-200 rounded-xl bg-lime-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-lime-300 focus:border-lime-400 focus:bg-white transition"
+          />
+        </div>
+
+        <div class="grid gap-1.5">
+          <label for="endDatetime" class="text-sm font-bold text-green-900">
+            End Date &amp; Time <span class="text-red-400">*</span>
+          </label>
+          <input
+            id="endDatetime"
+            name="endDatetime"
+            type="datetime-local"
+            required
+            value="<%= formValues ? formValues.endDatetime : '' %>"
+            class="w-full px-3.5 py-2.5 border-2 border-lime-200 rounded-xl bg-lime-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-lime-300 focus:border-lime-400 focus:bg-white transition"
+          />
+        </div>
+      </div>
+
+      <%# Capacity & Status row %>
+      <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-1.5">
+          <label for="capacity" class="text-sm font-bold text-green-900">
+            Capacity <span class="text-green-800 font-normal">(optional)</span>
+          </label>
+          <input
+            id="capacity"
+            name="capacity"
+            type="number"
+            min="1"
+            placeholder="e.g. 50"
+            value="<%= formValues && formValues.capacity !== null ? formValues.capacity : '' %>"
+            class="w-full px-3.5 py-2.5 border-2 border-lime-200 rounded-xl bg-lime-50 text-slate-800 placeholder:text-green-600 focus:outline-none focus:ring-2 focus:ring-lime-300 focus:border-lime-400 focus:bg-white transition"
+          />
+        </div>
+
+        <div class="grid gap-1.5">
+          <label for="status" class="text-sm font-bold text-green-900">Status</label>
+          <select
+            id="status"
+            name="status"
+            class="w-full px-3.5 py-2.5 border-2 border-lime-200 rounded-xl bg-lime-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-lime-300 focus:border-lime-400 focus:bg-white transition appearance-none cursor-pointer"
+          >
+            <option value="DRAFT" <%= (!formValues || formValues.status === 'DRAFT') ? 'selected' : '' %>>Draft</option>
+            <option value="PUBLISHED" <%= (formValues && formValues.status === 'PUBLISHED') ? 'selected' : '' %>>Published</option>
+          </select>
+        </div>
+      </div>
+
+      <hr class="border-lime-100" />
+
+      <%# Actions %>
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <a
+          href="/events"
+          class="px-4 py-2.5 rounded-xl border-2 border-lime-200 bg-white text-green-900 font-bold text-sm hover:bg-lime-50 transition no-underline"
+        >
+          Cancel
+        </a>
+        <button
+          type="submit"
+          class="px-6 py-2.5 rounded-xl bg-green-600 text-white font-extrabold text-sm cursor-pointer hover:bg-green-700 active:bg-green-800 transition shadow-sm"
+        >
+          Create Event 🐸
+        </button>
+      </div>
+
+    </form>
+
+    <%# Keroppi sitting beside the form on desktop %>
+    <img src="/keropi1.png" alt="Keroppi"
+      class="w-24 md:w-32 shrink-0 self-end drop-shadow-md hidden md:block" />
+  </div>
+</section>
