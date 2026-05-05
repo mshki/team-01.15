@@ -1,7 +1,11 @@
 <section id="event-list" class="grid gap-4">
   <% if (!events || events.length === 0) { %>
-    <div class="p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
-      <p class="text-slate-500 mb-0">No events match the current filters.</p>
+    <div class="flex items-center gap-4 p-6 border-2 border-pink-100 rounded-2xl bg-pink-50 shadow-sm">
+      <img src="/melody1.png" alt="My Melody" class="w-14 shrink-0 drop-shadow-sm" />
+      <div>
+        <p class="font-extrabold text-pink-700">No events found!</p>
+        <p class="text-pink-400 text-sm">Try clearing your filters or check back later 🌸</p>
+      </div>
     </div>
   <% } %>
 
