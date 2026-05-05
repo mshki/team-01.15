@@ -315,7 +315,7 @@ class EventController implements IEventController {
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Edit event failed: ${result.value.message}`);
         
-            res.status(status).render("events/partials/edit-form", {
+            res.status(status).render("events/edit", {
                 event: { id, title: name },
                 pageError: result.value.message,
                 values: {
