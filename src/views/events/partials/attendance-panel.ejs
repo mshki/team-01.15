@@ -19,35 +19,70 @@
   }
 %>
 
-<section id="<%= panelId %>"<%- oobAttr %> class="p-4 border border-slate-200 rounded-xl bg-white shadow-sm">
-  <h4 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-3">Attendance</h4>
-
-  <div class="flex flex-col gap-2 text-sm">
+<section
+  id="<%= panelId %>"<%- oobAttr %>
+  class="p-6 border-2 border-amber-100 rounded-3xl bg-gradient-to-br from-amber-50 via-yellow-50 to-stone-100 shadow-lg overflow-hidden"
+>
+  <div class="flex items-start justify-between gap-4 mb-4">
     <div>
-      <p class="text-xs text-slate-400 mb-0.5">Date &amp; time</p>
-      <p class="font-semibold text-slate-700"><%= formatDatetime(event.startDatetime) %></p>
-      <p class="text-xs text-slate-400">to <%= formatDatetime(event.endDatetime) %></p>
+      <h4 class="text-xs font-black text-amber-700 uppercase tracking-[0.22em]">Who’s Coming</h4>
+      <p class="text-sm text-stone-600 mt-1">A cozy little guest list, Pompompurin style.</p>
     </div>
 
-    <div class="border-t border-slate-100 pt-2">
+    <div class="flex -space-x-2">
+      <div class="w-8 h-8 rounded-full bg-amber-200 border-2 border-white flex items-center justify-center text-xs shadow-sm">🍮</div>
+      <div class="w-8 h-8 rounded-full bg-yellow-100 border-2 border-white flex items-center justify-center text-xs shadow-sm">✨</div>
+      <div class="w-8 h-8 rounded-full bg-stone-200 border-2 border-white flex items-center justify-center text-xs shadow-sm">🐾</div>
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-5 text-sm">
+    <div class="flex items-center gap-4">
+      <div class="shrink-0">
+        <img
+          src="/purin1.png"
+          alt="Pompompurin"
+          class="w-20 md:w-24 drop-shadow-md"
+        />
+      </div>
+      <div>
+        <p class="text-xs text-amber-700 font-bold mb-0.5 uppercase tracking-wide">Date &amp; time</p>
+        <p class="font-semibold text-stone-700"><%= formatDatetime(event.startDatetime) %></p>
+        <p class="text-xs text-stone-500">to <%= formatDatetime(event.endDatetime) %></p>
+      </div>
+    </div>
+
+    <div class="space-y-4">
       <% if (event.capacity !== null) { %>
         <% const fillPct = event.capacity > 0 ? Math.min(100, Math.round((goingCount / event.capacity) * 100)) : 0; %>
-        <p class="text-slate-700 font-semibold mb-1.5">
-          <%= goingCount %> / <%= event.capacity %> going
-          <% if (waitlistedCount > 0) { %><span class="text-slate-400 font-normal"> · <%= waitlistedCount %> waitlisted</span><% } %>
-        </p>
-        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-          <div
-            class="h-full rounded-full transition-all <%= goingCount >= event.capacity ? 'bg-red-400' : 'bg-fuchsia-500' %>"
-            style="width: <%= fillPct %>%"
-          ></div>
+
+        <div x-data="{ width: 0 }" x-init="setTimeout(() => width = <%= fillPct %>, 100)">
+          <div class="flex justify-between items-end mb-2">
+            <span class="text-2xl font-black text-stone-700">
+              <%= goingCount %><span class="text-sm text-stone-500 font-bold">/<%= event.capacity %></span>
+            </span>
+            <span class="text-xs font-bold text-amber-700"><%= fillPct %>% Full</span>
+          </div>
+
+          <div class="w-full h-4 bg-amber-100 rounded-full p-1 shadow-inner">
+            <div
+              class="h-full rounded-full transition-all <%= goingCount >= event.capacity ? 'bg-orange-400' : 'bg-amber-400' %>"
+              style="width: <%= fillPct %>%"
+            ></div>
+          </div>
         </div>
-        <p class="text-xs text-slate-400 mt-1"><%= fillPct %>% full</p>
+
+        <% if (waitlistedCount > 0) { %>
+          <p class="text-center text-xs font-bold text-amber-900 bg-amber-50 border border-amber-100 py-1 rounded-lg">
+            🍮 <%= waitlistedCount %> friend(s) on the waitlist
+          </p>
+        <% } %>
       <% } else { %>
-        <p class="text-slate-700 font-semibold">
-          <%= goingCount %> going
-          <% if (waitlistedCount > 0) { %><span class="text-slate-400 font-normal"> · <%= waitlistedCount %> waitlisted</span><% } %>
-          <span class="text-slate-400 font-normal"> · unlimited</span>
+        <p class="text-2xl font-black text-stone-700">
+          <%= goingCount %> <span class="text-sm text-stone-500">going</span>
+        </p>
+        <p class="text-xs font-bold text-stone-500 tracking-tight">
+          Unlimited capacity! The more the merrier! ☁️
         </p>
       <% } %>
     </div>
