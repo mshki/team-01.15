@@ -12,8 +12,8 @@
 
   // Configuration for States
   const states = {
-    GOING: { label: 'Cancel RSVP', classes: 'bg-[#78350f] text-white border-[#78350f]/30 hover:bg-[#78350f]/70', icon: '૮₍˃̵ꈊ ˂̵₎ა' },
-    WAITLISTED: { label: 'Leave Waitlist', classes: 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200', icon: '૮˶- ﻌ -˶ა⌒)ᦱ' },
+    GOING: { label: 'Cancel RSVP', classes: 'bg-[#7f292c]/90 text-white border-[#7f292c]/70 hover:bg-[#7f292c] shadow-md', icon: '૮₍˃̵ꈊ ˂̵₎ა' },
+    WAITLISTED: { label: 'Leave Waitlist', classes: 'bg-amber-200 text-amber-700 border-amber-200 hover:bg-amber-300 shadow-md', icon: '૮˶- ﻌ -˶ა⌒)ᦱ' },
     CANCELLED: { label: 'Reactivate RSVP', classes: 'bg-amber-500 text-white border-transparent hover:bg-amber-600 shadow-md', icon: '૮ ◞ ﻌ ◟ ა' },
     NONE: { 
         label: eventIsFull ? 'Join Waitlist' : 'RSVP Now', 
@@ -28,7 +28,7 @@
 <section 
   id="<%= panelId %>" 
   x-data="{ processing: false }"
-  class="relative p-6 border-2 border-[#78350f]/30 rounded-3xl bg-amber-700/40 shadow-lg overflow-hidden transition-all duration-300"
+  class="relative p-6 border-2 border-[#7f292c]/30 rounded-3xl bg-amber-700/40 shadow-lg overflow-hidden transition-all duration-300"
   :class="processing ? 'opacity-50 scale-[0.98]' : 'opacity-100'"
 >
   <!-- <div class="absolute top-0 left-0 w-full h-3 rounded-3xl bg-[#78350f]"></div> -->
