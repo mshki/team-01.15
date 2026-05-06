@@ -1,128 +1,102 @@
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" />
+<section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
+  <h1 class="text-3xl font-bold text-slate-900 mb-3">Admin User Management</h1>
+  <p class="text-slate-500">
+    Admin accounts can add new users, assign roles, and remove existing users from the
+    in-memory user repository.
+  </p>
+</section>
 
-<div class="font-[Nunito,sans-serif] flex flex-col gap-5">
+<% if (pageError) { %>
+  <%- include("partials/error", { message: pageError }) %>
+<% } %>
 
-  <section class="p-6 border-2 border-yellow-200 rounded-2xl bg-gradient-to-br from-yellow-50 to-zinc-100 shadow-lg overflow-hidden">
-    <div class="flex items-end justify-between gap-4">
-      <div class="flex-1">
-        <h1 class="text-3xl font-extrabold text-zinc-900 mb-1">Manage Users 😎</h1>
-        <p class="text-zinc-600 text-sm">
-          Add new accounts, assign roles, and manage existing users.
-        </p>
-      </div>
-      <div class="flex items-end gap-1 shrink-0 hidden sm:flex">
-        <img src="/badtzmaru2.png" alt="Badtz-Maru" class="w-24 md:w-32 drop-shadow-md self-end" />
-        <img src="/badtzmaru1.png" alt="Badtz-Maru" class="w-20 md:w-28 drop-shadow-md self-end" />
-      </div>
+<section class="grid grid-cols-1 md:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.1fr)] gap-5">
+  <section class="p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Add User</h2>
+      <p class="text-slate-500">Create a new admin, staff, or user account with a hashed password.</p>
     </div>
+
+    <form class="grid gap-2.5" method="post" action="/admin/users">
+      <label for="displayName" class="text-sm font-medium">Display Name</label>
+      <input
+        id="displayName"
+        name="displayName"
+        required
+        class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+      />
+
+      <label for="email" class="text-sm font-medium">Email</label>
+      <input
+        id="email"
+        name="email"
+        type="email"
+        autocomplete="email"
+        required
+        class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+      />
+
+      <label for="password" class="text-sm font-medium">Password</label>
+      <input
+        id="password"
+        name="password"
+        type="password"
+        autocomplete="new-password"
+        required
+        class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+      />
+
+      <label for="role" class="text-sm font-medium">Role</label>
+      <select
+        id="role"
+        name="role"
+        class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+      >
+        <option value="user">User</option>
+        <option value="staff">Staff</option>
+        <option value="admin">Admin</option>
+      </select>
+
+      <button
+        type="submit"
+        class="mt-1 px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium cursor-pointer hover:bg-blue-700"
+      >
+        Add User
+      </button>
+    </form>
   </section>
 
-  <% if (pageError) { %>
-    <%- include("partials/error", { message: pageError }) %>
-  <% } %>
+  <section class="p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Existing Users</h2>
+      <p class="text-slate-500">The admin can remove any account except the currently signed-in admin.</p>
+    </div>
 
-  <section class="grid grid-cols-1 lg:grid-cols-[minmax(280px,0.95fr)_minmax(0,1.05fr)] gap-5">
+    <ul class="list-none m-0 p-0 grid gap-3.5">
+      <% users.forEach((user) => { %>
+        <li class="flex items-center justify-between gap-4 p-4 border border-slate-200 rounded-xl bg-slate-50">
+          <div>
+            <strong class="text-slate-900"><%= user.displayName %></strong>
+            <p class="text-sm text-slate-500 mt-0.5 mb-0"><%= user.email %></p>
+            <p class="text-sm text-slate-500 mb-0">role=<%= user.role %></p>
+          </div>
 
-    <section class="rounded-2xl border-2 border-zinc-200 bg-white shadow-md overflow-hidden">
-      <div class="h-2 bg-gradient-to-r from-zinc-900 via-yellow-400 to-zinc-900"></div>
-
-      <div class="p-6">
-        <div class="mb-4">
-          <h2 class="text-xl font-extrabold text-zinc-900 mb-2">Add User</h2>
-          <p class="text-zinc-500 text-sm">
-            Create a new admin, staff, or user account.
-          </p>
-        </div>
-
-        <form class="grid gap-2.5" method="post" action="/admin/users">
-          <label for="displayName" class="text-sm font-bold text-zinc-800">Display Name</label>
-          <input
-            id="displayName"
-            name="displayName"
-            required
-            class="w-full px-4 py-2.5 border-2 border-yellow-200 rounded-xl bg-yellow-50 text-zinc-800 focus:outline-none focus:border-yellow-400 focus:bg-white transition"
-          />
-
-          <label for="email" class="text-sm font-bold text-zinc-800">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autocomplete="email"
-            required
-            class="w-full px-4 py-2.5 border-2 border-yellow-200 rounded-xl bg-yellow-50 text-zinc-800 focus:outline-none focus:border-yellow-400 focus:bg-white transition"
-          />
-
-          <label for="password" class="text-sm font-bold text-zinc-800">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autocomplete="new-password"
-            required
-            class="w-full px-4 py-2.5 border-2 border-yellow-200 rounded-xl bg-yellow-50 text-zinc-800 focus:outline-none focus:border-yellow-400 focus:bg-white transition"
-          />
-
-          <label for="role" class="text-sm font-bold text-zinc-800">Role</label>
-          <select
-            id="role"
-            name="role"
-            class="w-full px-4 py-2.5 border-2 border-yellow-200 rounded-xl bg-yellow-50 text-zinc-800 focus:outline-none focus:border-yellow-400 focus:bg-white transition"
-          >
-            <option value="user">User</option>
-            <option value="staff">Staff</option>
-            <option value="admin">Admin</option>
-          </select>
-
-          <button
-            type="submit"
-            class="mt-2 px-4 py-2.5 rounded-xl bg-zinc-900 text-yellow-400 font-bold cursor-pointer hover:bg-zinc-700 transition shadow-sm"
-          >
-            Add User
-          </button>
-        </form>
-      </div>
-    </section>
-
-    <section class="rounded-2xl border-2 border-zinc-200 bg-white shadow-md overflow-hidden">
-      <div class="h-2 bg-gradient-to-r from-zinc-900 via-yellow-400 to-zinc-900"></div>
-
-      <div class="p-6">
-        <div class="mb-4">
-          <h2 class="text-xl font-extrabold text-zinc-900 mb-2">Existing Users</h2>
-          <p class="text-zinc-500 text-sm">
-            The current signed-in admin cannot be removed.
-          </p>
-        </div>
-
-        <ul class="list-none m-0 p-0 grid gap-3.5">
-          <% users.forEach((user) => { %>
-            <li class="flex items-center justify-between gap-4 p-4 border-2 border-yellow-100 rounded-2xl bg-yellow-50/60">
-              <div>
-                <strong class="text-zinc-900 font-extrabold"><%= user.displayName %></strong>
-                <p class="text-sm text-zinc-500 mt-0.5 mb-0"><%= user.email %></p>
-                <p class="text-sm text-zinc-500 mb-0">role=<%= user.role %></p>
-              </div>
-
-              <% if (session.authenticatedUser && session.authenticatedUser.userId === user.id) { %>
-                <span class="inline-flex items-center justify-center min-w-[120px] px-3 py-1.5 rounded-full text-sm font-bold bg-yellow-100 text-zinc-900 border border-yellow-300">
-                  Current Admin
-                </span>
-              <% } else { %>
-                <form method="post" action="/admin/users/<%= user.id %>/delete" class="m-0">
-                  <button
-                    type="submit"
-                    class="px-4 py-2 rounded-xl bg-white text-red-600 border-2 border-red-200 font-bold cursor-pointer hover:bg-red-50 text-sm transition"
-                  >
-                    Remove
-                  </button>
-                </form>
-              <% } %>
-            </li>
-          <% }) %>
-        </ul>
-      </div>
-    </section>
-
+          <% if (session.authenticatedUser && session.authenticatedUser.userId === user.id) { %>
+            <span class="inline-flex items-center justify-center min-w-[110px] px-2.5 py-1.5 rounded-full text-sm font-semibold capitalize bg-blue-600/12 text-blue-700">
+              Current Admin
+            </span>
+          <% } else { %>
+            <form method="post" action="/admin/users/<%= user.id %>/delete" class="m-0">
+              <button
+                type="submit"
+                class="px-3.5 py-2 rounded-lg bg-red-700 text-white font-medium cursor-pointer hover:bg-red-800 text-sm"
+              >
+                Remove
+              </button>
+            </form>
+          <% } %>
+        </li>
+      <% }) %>
+    </ul>
   </section>
-</div>
+</section>
