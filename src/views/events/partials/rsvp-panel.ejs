@@ -12,13 +12,13 @@
 
   // Configuration for States
   const states = {
-    GOING: { label: 'Cancel RSVP', classes: 'bg-rose-100 text-rose-700 border-rose-200 hover:bg-rose-200', icon: '✨' },
-    WAITLISTED: { label: 'Leave Waitlist', classes: 'bg-sky-100 text-sky-700 border-sky-200 hover:bg-sky-200', icon: '⏳' },
-    CANCELLED: { label: 'Reactivate RSVP', classes: 'bg-amber-500 text-white border-transparent hover:bg-amber-600 shadow-md', icon: '🍮' },
+    GOING: { label: 'Cancel RSVP', classes: 'bg-rose-100 text-rose-700 border-rose-200 hover:bg-rose-200', icon: '૮₍˃̵ꈊ ˂̵₎ა' },
+    WAITLISTED: { label: 'Leave Waitlist', classes: 'bg-sky-100 text-sky-700 border-sky-200 hover:bg-sky-200', icon: '૮˶- ﻌ -˶ა⌒)ᦱ' },
+    CANCELLED: { label: 'Reactivate RSVP', classes: 'bg-amber-500 text-white border-transparent hover:bg-amber-600 shadow-md', icon: '૮ ◞ ﻌ ◟ ა' },
     NONE: { 
         label: eventIsFull ? 'Join Waitlist' : 'RSVP Now', 
         classes: 'bg-amber-500 text-white border-transparent hover:bg-amber-600 shadow-md', 
-        icon: '💛' 
+        icon: '૮・ᴥ・ა' 
     }
   };
 
@@ -28,17 +28,17 @@
 <section 
   id="<%= panelId %>" 
   x-data="{ processing: false }"
-  class="relative p-6 border-4 border-amber-200 rounded-3xl bg-white shadow-[0_8px_0_0_rgba(253,230,138,1)] overflow-hidden transition-all duration-300"
+  class="relative p-6 border-2 border-[#78350f]/50 rounded-3xl bg-amber-700/40 shadow-lg overflow-hidden transition-all duration-300"
   :class="processing ? 'opacity-50 scale-[0.98]' : 'opacity-100'"
 >
   <!-- <div class="absolute top-0 left-0 w-full h-3 rounded-3xl bg-[#78350f]"></div> -->
 
   <div class="flex justify-between items-start mb-4">
     <div>
-      <h4 class="text-lg font-black text-amber-900 flex items-center gap-2">
-        <%= currentState.icon %> Your RSVP
+      <h4 class="text-lg font-black text-amber-800 uppercase tracking-[0.22em]">
+        Your RSVP <%= currentState.icon %>
       </h4>
-      <p class="text-amber-700/80 text-sm font-medium">
+      <p class="text-amber-900 text-sm font-medium">
         <% if (status === 'GOING') { %> You're on the list! See you there! 
         <% } else if (status === 'WAITLISTED') { %> You're on the waitlist. 
         <% } else if (status === 'CANCELLED') { %> Your RSVP is currently cancelled.
