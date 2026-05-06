@@ -1,6 +1,13 @@
 Service Level Contracts
 
-## Sprintg 1
+## Roles
+Henry - Feature 1 and 2 (event creation and event details)
+Katherine - Feature 3 and 4 (event editing and RSVP toggle)
+Richard - Feature 5 and 6 (event publishing/cancellation and category/date filter)
+William - Feature 9 and 10 (waitlist promotion and event search)
+
+
+## Sprint 1
 Feature 1: EventService.createEvent() takes in a {title, desc, location, category, datetime}returns an event object with the EventDesc fields.
 
 Feature 2: EventService.getEvent() return the EventDesc object
