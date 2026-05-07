@@ -1,120 +1,24 @@
-<section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
-  <h1 class="text-3xl font-bold text-slate-900 mb-3">Create New Event</h1>
-</section>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" />
 
-<div id="create-event-form-wrapper">
-  <% if (typeof pageError !== 'undefined' && pageError) { %>
-    <%- include("../partials/error", { message: pageError }) %>
-  <% } %>
+<div class="font-[Nunito,sans-serif] flex flex-col gap-5">
 
-  <section class="max-w-3xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
-    <form
-      class="grid gap-4"
-      hx-post="/events"
-      hx-target="#create-event-form-wrapper"
-      hx-swap="innerHTML"
-      hx-push-url="false"
-    >
+  <%# ── Header card ── %>
+  <section class="p-6 border-2 border-lime-200 rounded-2xl bg-gradient-to-br from-lime-50 to-green-100 shadow-lg overflow-hidden">
+    <div class="flex items-end justify-between gap-4">
       <div>
-        <label for="name" class="block text-sm font-medium mb-1">Name</label>
-        <input
-          id="name"
-          name="name"
-          type="text"
-          required
-          value="<%= typeof formValues !== 'undefined' ? formValues.name : '' %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
-        />
+        <h1 class="text-3xl font-extrabold text-green-900 mb-1">Create New Event 🐸</h1>
+        <p class="text-green-900 text-sm">Fill in the details below to create your event.</p>
       </div>
-
-      <div>
-        <label for="description" class="block text-sm font-medium mb-1">Description</label>
-        <textarea
-          id="description"
-          name="description"
-          rows="4"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
-        ><%= typeof formValues !== 'undefined' ? formValues.description : '' %></textarea>
-      </div>
-
-      <div>
-        <label for="location" class="block text-sm font-medium mb-1">Location</label>
-        <input
-          id="location"
-          name="location"
-          type="text"
-          value="<%= typeof formValues !== 'undefined' ? formValues.location : '' %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
-        />
-      </div>
-
-      <div>
-        <label for="category" class="block text-sm font-medium mb-1">
-          Category <span class="text-slate-400 font-normal">(optional)</span>
-        </label>
-        <input
-          id="category"
-          name="category"
-          type="text"
-          value="<%= typeof formValues !== 'undefined' && formValues.category ? formValues.category : '' %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
-        />
-      </div>
-
-      <div>
-        <label for="startDatetime" class="block text-sm font-medium mb-1">Start Date &amp; Time</label>
-        <input
-          id="startDatetime"
-          name="startDatetime"
-          type="datetime-local"
-          required
-          value="<%= typeof formValues !== 'undefined' ? formValues.startDatetime : '' %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
-        />
-      </div>
-
-      <div>
-        <label for="endDatetime" class="block text-sm font-medium mb-1">End Date &amp; Time</label>
-        <input
-          id="endDatetime"
-          name="endDatetime"
-          type="datetime-local"
-          required
-          value="<%= typeof formValues !== 'undefined' ? formValues.endDatetime : '' %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
-        />
-      </div>
-
-      <div>
-        <label for="capacity" class="block text-sm font-medium mb-1">Capacity <span class="text-slate-400 font-normal">(optional)</span></label>
-        <input
-          id="capacity"
-          name="capacity"
-          type="number"
-          min="1"
-          value="<%= typeof formValues !== 'undefined' && formValues.capacity !== null ? formValues.capacity : '' %>"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
-        />
-      </div>
-
-      <div>
-        <label for="status" class="block text-sm font-medium mb-1">Status</label>
-        <select
-          id="status"
-          name="status"
-          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
-        >
-          <option value="DRAFT" <%= (typeof formValues === 'undefined' || formValues.status === 'DRAFT') ? 'selected' : '' %>>Draft</option>
-          <option value="PUBLISHED" <%= (typeof formValues !== 'undefined' && formValues.status === 'PUBLISHED') ? 'selected' : '' %>>Published</option>
-        </select>
-      </div>
-
-      <button
-        type="submit"
-        class="mt-1 px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium cursor-pointer hover:bg-blue-700"
-      >
-        Create Event
-      </button>
-    </form>
+      <img src="/keropi2.png" alt="Keroppi"
+        class="w-28 md:w-40 shrink-0 drop-shadow-md self-end hidden sm:block" />
+    </div>
   </section>
+
+    <%- include("./partials/event-form-field", {
+      isEditMode: false,
+      pageError: typeof pageError !== 'undefined' ? pageError : null,
+      values: typeof formValues !== 'undefined' ? formValues : null
+    }) %>
+
+
 </div>

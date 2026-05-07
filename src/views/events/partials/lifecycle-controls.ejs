@@ -11,10 +11,10 @@
   };
 
   const statusColors = {
-    PUBLISHED: 'bg-green-100 text-green-800',
-    DRAFT: 'bg-yellow-100 text-yellow-800',
-    CANCELLED: 'bg-red-100 text-red-800',
-    CONCLUDED: 'bg-slate-100 text-slate-600',
+    PUBLISHED: 'bg-amber-100 text-amber-800 border-amber-200',
+    DRAFT: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    CANCELLED: 'bg-red-100 text-red-700 border-red-200',
+    CONCLUDED: 'bg-stone-100 text-stone-600 border-stone-200',
   };
 %>
 
@@ -23,21 +23,37 @@
     <%- include("../../partials/error", { message: pageError }) %>
   <% } %>
 
-  <div id="status-badge-region" class="flex items-center gap-2 flex-wrap">
-    <span class="inline-block px-3 py-1 rounded-full text-sm font-medium <%= statusColors[event.status] %>">
+  <div
+    id="status-badge-region"
+    class="flex items-center gap-2 flex-wrap"
+    x-data="{ pulse: false }"
+    x-init="
+      document.body.addEventListener('htmx:afterSwap', (e) => {
+        if ($el.contains(e.target) || e.target.id === 'lifecycle-region') {
+          pulse = true;
+          setTimeout(() => pulse = false, 450);
+        }
+      })
+    "
+  >
+    <span
+      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border transition-transform duration-300 <%= statusColors[event.status] %>"
+      :class="pulse ? 'scale-105 ring-2 ring-amber-300' : ''"
+    >
       <%= statusLabels[event.status] %>
     </span>
   </div>
 
   <% if (isAdmin || isOrganizer) { %>
-    <section class="p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
-      <h2 class="text-lg font-semibold text-slate-900 mb-4">Manage event</h2>
+    <section class="p-6 border-2 border-amber-100 rounded-2xl bg-white shadow-md overflow-hidden">
+      <div class="h-1.5 -mx-6 -mt-6 mb-4 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300"></div>
+      <h2 class="text-lg font-extrabold text-amber-900 mb-4">Manage Event</h2>
 
       <% if (canEdit) { %>
         <div class="flex flex-wrap gap-3">
           <a
             href="/events/<%= event.id %>/edit"
-            class="px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 no-underline text-sm"
+            class="px-4 py-2.5 rounded-xl bg-amber-100 text-amber-900 font-bold hover:bg-amber-200 no-underline text-sm transition"
           >
             Edit event
           </a>
@@ -52,7 +68,7 @@
             >
               <button
                 type="submit"
-                class="px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 cursor-pointer text-sm"
+                class="px-4 py-2.5 rounded-xl bg-amber-800 text-yellow-50 font-bold hover:bg-amber-900 cursor-pointer text-sm transition shadow-sm"
               >
                 Publish event
               </button>
@@ -69,7 +85,7 @@
             >
               <button
                 type="submit"
-                class="px-4 py-2.5 rounded-lg bg-white text-red-700 border border-red-300 font-medium hover:bg-red-50 cursor-pointer text-sm"
+                class="px-4 py-2.5 rounded-xl bg-white text-red-600 border-2 border-red-200 font-bold hover:bg-red-50 cursor-pointer text-sm transition"
                 onclick="return confirm('Cancel this event? This cannot be undone.')"
               >
                 Cancel event
@@ -78,7 +94,7 @@
           <% } %>
         </div>
       <% } else { %>
-        <p class="text-sm text-slate-500">
+        <p class="text-sm text-amber-700">
           This event can no longer be edited because it has been cancelled or concluded.
         </p>
       <% } %>

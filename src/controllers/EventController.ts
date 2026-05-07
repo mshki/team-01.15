@@ -3,8 +3,6 @@ import { IEventService } from "../service/EventService";
 import { ILoggingService } from "../service/LoggingService";
 import { IAppBrowserSession, IAuthenticatedUserSession } from "../session/AppSession";
 import { EventError, RSVPError } from "../lib/errors";
-import { IApp } from "../contracts";
-import { stat } from "node:fs";
 import { EventStatus } from "../types/EventTypes";
 
 export interface IEventController {
@@ -140,12 +138,21 @@ class EventController implements IEventController {
             const log = httpStatus === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Create event failed: ${result.value.message}`);
 
-            res.status(isHtmx ? 200 : httpStatus).render("events/new", {
-                session,
-                pageError: result.value.message,
-                formValues: { name, description, location, category, status, startDatetime, endDatetime, capacity },
-                layout: isHtmx ? false : "layouts/base",
-            });
+            if (isHtmx) {
+                res.status(200).render("events/partials/event-form-field", {
+                    session,
+                    isEditMode: false,
+                    pageError: result.value.message,
+                    formValues: { name, description, location, category, status, startDatetime, endDatetime, capacity },
+                    layout: false,
+                });
+            } else {
+                res.status(httpStatus).render("events/new", {
+                    session,
+                    pageError: result.value.message,
+                    formValues: { name, description, location, category, status, startDatetime, endDatetime, capacity },
+                });
+            }
             return;
         }
 
@@ -315,8 +322,10 @@ class EventController implements IEventController {
             const log = status === 400 ? this.logger.warn : this.logger.error;
             log.call(this.logger, `Edit event failed: ${result.value.message}`);
         
-            res.status(status).render("events/partials/edit-form", {
+            res.status(status).render("events/partials/event-form-field", {
+                session,
                 event: { id, title: name },
+                isEditMode: true,
                 pageError: result.value.message,
                 values: {
                     title: name,
@@ -328,7 +337,6 @@ class EventController implements IEventController {
                     endDatetime,
                     capacity,
                 },
-                session,
                 layout: false,
             });
             return;

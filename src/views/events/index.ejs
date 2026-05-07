@@ -1,68 +1,139 @@
-<section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
-  <h1 class="text-3xl font-bold text-slate-900 mb-3">Browse Events</h1>
-  <p class="text-slate-500">
-    Filter published events by timeframe and category.
-  </p>
-</section>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" />
 
-<% if (pageError) { %>
-  <%- include("../partials/error", { message: pageError }) %>
-<% } %>
+<div class="font-[Nunito,sans-serif] flex flex-col gap-5">
 
-<section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
-  <h2 class="text-xl font-semibold mb-4">Filter Events</h2>
-
-  <form
-    method="get"
-    action="/events"
-    hx-get="/events"
-    hx-target="#event-list"
-    hx-swap="outerHTML"
-    hx-push-url="true"
-    class="grid gap-4 md:grid-cols-3"
->
-    <div>
-      <label for="timeframe" class="block text-sm font-medium mb-1">Timeframe</label>
-      <select
-        id="timeframe"
-        name="timeframe"
-        class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white"
-      >
-        <option value="all" <%= timeframe === "all" ? "selected" : "" %>>All upcoming</option>
-        <option value="week" <%= timeframe === "week" ? "selected" : "" %>>This week</option>
-        <option value="weekend" <%= timeframe === "weekend" ? "selected" : "" %>>This weekend</option>
-      </select>
+  <%# ── Header card with melody2 tucked in ── %>
+  <section class="p-6 border-2 border-pink-200 rounded-2xl bg-gradient-to-br from-pink-50 to-pink-100 shadow-lg overflow-hidden">
+    <div class="flex items-end justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-extrabold text-pink-600 mb-1">Browse Events ૮ ྀིᴗ͈ . ᴗ͈ ྀིა</h1>
+        <p class="text-pink-400 text-sm">Find something fun to do — search or filter below.</p>
+      </div>
+      <img src="/melody2.png" alt="My Melody"
+        class="w-28 md:w-40 shrink-0 drop-shadow-md self-end hidden sm:block" />
     </div>
+  </section>
 
-    <div>
-      <label for="category" class="block text-sm font-medium mb-1">Category</label>
-      <input
-        id="category"
-        name="category"
-        type="text"
-        value="<%= category ?? "" %>"
-        class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white"
-      />
-    </div>
+  <% if (pageError) { %>
+    <%- include("../partials/error", { message: pageError }) %>
+  <% } %>
 
-    <div class="flex items-end gap-2">
+  <%# ── Search bar ── %>
+  <section class="p-6 border-2 border-pink-100 rounded-2xl bg-white shadow-md">
+    <form
+      method="get"
+      action="/events/search"
+      class="flex flex-col sm:flex-row gap-3"
+      x-data="{ query: '' }"
+    >
+      <label for="event-search" class="sr-only">Search events</label>
+
+      <div class="relative flex-1">
+        <svg
+          class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-pink-300 pointer-events-none"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+        >
+          <circle cx="11" cy="11" r="7"/>
+          <path d="m21 21-4.3-4.3"/>
+        </svg>
+
+        <input
+          id="event-search"
+          name="q"
+          type="text"
+          placeholder="Search events by title, location, or category..."
+          x-model="query"
+          class="w-full pl-12 pr-12 py-3.5 text-base border-2 border-pink-200 rounded-xl bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-300 focus:bg-white placeholder:text-pink-300 text-slate-700 transition"
+        />
+
+        <button
+          type="button"
+          x-show="query.length > 0"
+          x-cloak
+          @click="query = ''"
+          aria-label="Clear search"
+          class="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full text-pink-300 hover:bg-pink-100 hover:text-pink-500 transition cursor-pointer"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M6 6l12 12M18 6L6 18"/>
+          </svg>
+        </button>
+      </div>
+
       <button
         type="submit"
-        class="px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 cursor-pointer"
+        class="px-6 py-3.5 rounded-xl bg-pink-500 text-white text-base font-bold hover:bg-pink-600 cursor-pointer transition shadow-sm"
       >
-        Apply Filters
+        Search
       </button>
+    </form>
+  </section>
 
-      <a
-        href="/events"
-        class="px-4 py-2.5 rounded-lg bg-white text-slate-700 border border-slate-300 font-medium no-underline hover:bg-slate-50"
-      >
-        Clear
-      </a>
+  <%# ── Filter section with melody1 tucked in ── %>
+  <section class="p-6 border-2 border-pink-100 rounded-2xl bg-white shadow-md">
+    <div class="flex items-start justify-between gap-4">
+      <div class="flex-1">
+        <h2 class="text-lg font-extrabold text-pink-600 mb-4">Filter Events</h2>
+
+        <form
+          method="get"
+          action="/events"
+          hx-get="/events"
+          hx-target="#event-list"
+          hx-swap="outerHTML"
+          hx-push-url="true"
+          class="grid gap-4 md:grid-cols-3"
+        >
+          <div class="grid gap-1.5">
+            <label for="timeframe" class="block text-sm font-bold text-pink-500">Timeframe</label>
+            <select
+              id="timeframe"
+              name="timeframe"
+              class="w-full px-3 py-2.5 border-2 border-pink-200 rounded-xl bg-pink-50 text-slate-700 focus:outline-none focus:border-pink-400 transition"
+            >
+              <option value="all" <%= timeframe === "all" ? "selected" : "" %>>All upcoming</option>
+              <option value="week" <%= timeframe === "week" ? "selected" : "" %>>This week</option>
+              <option value="weekend" <%= timeframe === "weekend" ? "selected" : "" %>>This weekend</option>
+            </select>
+          </div>
+
+          <div class="grid gap-1.5">
+            <label for="category" class="block text-sm font-bold text-pink-500">Category</label>
+            <input
+              id="category"
+              name="category"
+              type="text"
+              value="<%= category ?? "" %>"
+              placeholder="e.g. Workshop, Social…"
+              class="w-full px-3 py-2.5 border-2 border-pink-200 rounded-xl bg-pink-50 text-slate-700 placeholder:text-pink-300 focus:outline-none focus:border-pink-400 focus:bg-white transition"
+            />
+          </div>
+
+          <div class="flex items-end gap-2">
+            <button
+              type="submit"
+              class="px-4 py-2.5 rounded-xl bg-pink-500 text-white font-bold hover:bg-pink-600 cursor-pointer transition shadow-sm"
+            >
+              Apply Filters
+            </button>
+            <a
+              href="/events"
+              class="px-4 py-2.5 rounded-xl bg-white text-pink-500 border-2 border-pink-200 font-bold no-underline hover:bg-pink-50 transition"
+            >
+              Clear
+            </a>
+          </div>
+        </form>
       </div>
-  </form>
-</section>
-<%- include("./partials/event-list", {
-  events,
-  session
-}) %>
+
+      <img src="/melody1.png" alt="My Melody"
+        class="w-24 md:w-36 shrink-0 drop-shadow-md self-end hidden sm:block" />
+    </div>
+  </section>
+
+  <%- include("./partials/event-list", {
+    events,
+    session
+  }) %>
+
+</div>

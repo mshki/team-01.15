@@ -243,7 +243,6 @@ class ExpressApp implements IApp {
     );
 
     // ── Authenticated home page ──────────────────────────────────────
-    // TODO: Replace this placeholder with your project's main page.
 
     this.app.get(
       "/home",
@@ -254,7 +253,27 @@ class ExpressApp implements IApp {
 
         const browserSession = recordPageView(sessionStore(req));
         this.logger.info(`GET /home for ${browserSession.browserLabel}`);
-        res.render("home", { session: browserSession, pageError: null });
+
+        const eventsResult = await this.eventService.filterPublishedEvents("all", null);
+        const allEvents = eventsResult.ok ? eventsResult.value : [];
+
+        const userId = browserSession.authenticatedUser?.userId;
+        const now = new Date();
+
+        // Upcoming: starts in the future, sorted soonest first
+        const upcomingEvents = allEvents
+          .filter(e => new Date(e.startDatetime) > now)
+          .sort((a, b) => new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime())
+          .slice(0, 6);
+
+        // User's RSVPs across all events
+        const myRsvpEvents = userId
+          ? allEvents.filter(e =>
+              e.attendees.some(a => a.userId === userId && a.rsvpStatus === 'GOING')
+            ).sort((a, b) => new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime())
+          : [];
+
+        res.render("home", { session: browserSession, pageError: null, upcomingEvents, myRsvpEvents });
       }),
     );
 

@@ -1,53 +1,80 @@
 <%
   const currentUser = session?.authenticatedUser;
   const attendees = Array.isArray(event?.attendees) ? event.attendees : [];
-
   const suffix = typeof idSuffix !== 'undefined' && idSuffix !== null ? `-${idSuffix}` : '';
   const panelId = `rsvp-panel${suffix}`;
-  const formId = `rsvp-form${suffix}`;
 
-  const userRsvp = currentUser
-    ? attendees.find((a) => a.userId === currentUser.userId) ?? null
-    : null;
-
+  const userRsvp = currentUser ? attendees.find((a) => a.userId === currentUser.userId) : null;
+  const status = userRsvp?.rsvpStatus; // GOING, WAITLISTED, CANCELLED, or undefined
+  
   const goingCount = attendees.filter((a) => a.rsvpStatus === 'GOING').length;
   const eventIsFull = event.capacity !== null && goingCount >= event.capacity;
-  const isActive = userRsvp !== null && userRsvp.rsvpStatus !== 'CANCELLED';
 
-  const buttonLabel = !userRsvp
-    ? (eventIsFull ? 'Join waitlist' : 'RSVP to this event')
-    : (isActive ? 'Cancel RSVP' : 'Reactivate RSVP');
+  // Configuration for States
+  const states = {
+    GOING: { label: 'Cancel RSVP', classes: 'bg-[#7f292c]/90 text-white border-[#7f292c]/70 hover:bg-[#7f292c] shadow-md', icon: '૮₍˃̵ꈊ ˂̵₎ა' },
+    WAITLISTED: { label: 'Leave Waitlist', classes: 'bg-amber-200 text-amber-700 border-amber-200 hover:bg-amber-300 shadow-md', icon: '૮˶- ﻌ -˶ა⌒)ᦱ' },
+    CANCELLED: { label: 'Reactivate RSVP', classes: 'bg-amber-500 text-white border-transparent hover:bg-amber-600 shadow-md', icon: '૮ ◞ ﻌ ◟ ა' },
+    NONE: { 
+        label: eventIsFull ? 'Join Waitlist' : 'RSVP Now', 
+        classes: 'bg-amber-500 text-white border-transparent hover:bg-amber-600 shadow-md', 
+        icon: '૮・ᴥ・ა' 
+    }
+  };
 
-  const helpText = !userRsvp
-    ? (eventIsFull
-        ? 'This event is full, so new RSVPs will be waitlisted.'
-        : "You haven't RSVP'd yet.")
-    : (isActive
-        ? `You are currently marked as ${userRsvp.rsvpStatus.toLowerCase()}.`
-        : 'Your RSVP is cancelled.');
+  const currentState = states[status] || states['NONE'];
 %>
 
-<section id="<%= panelId %>" class="p-5 border border-slate-200 rounded-2xl bg-white shadow-lg">
-  <h4 class="text-base font-semibold text-slate-900 mb-2">Your RSVP</h4>
+<section 
+  id="<%= panelId %>" 
+  x-data="{ processing: false }"
+  class="relative p-6 border-2 border-[#7f292c]/30 rounded-3xl bg-amber-700/40 shadow-lg overflow-hidden transition-all duration-300"
+  :class="processing ? 'opacity-50 scale-[0.98]' : 'opacity-100'"
+>
+  <!-- <div class="absolute top-0 left-0 w-full h-3 rounded-3xl bg-[#78350f]"></div> -->
 
-  <p class="text-slate-600 text-sm mb-4"><%= helpText %></p>
+  <div class="flex justify-between items-start mb-4">
+    <div>
+      <h4 class="text-lg font-black text-amber-800 uppercase tracking-[0.22em]">
+        Your RSVP <%= currentState.icon %>
+      </h4>
+      <p class="text-amber-900 text-sm font-medium">
+        <% if (status === 'GOING') { %> You're on the list! See you there! 
+        <% } else if (status === 'WAITLISTED') { %> You're on the waitlist. 
+        <% } else if (status === 'CANCELLED') { %> Your RSVP is currently cancelled.
+        <% } else { %> <%= eventIsFull ? 'Event is full, but you can join the waitlist!' : 'Want to come? Let us know!' %> 
+        <% } %>
+      </p>
+    </div>
+    
+  </div>
+
+  <div class="hidden sm:block absolute -bottom-0 -right-0 pointer-events-none">
+    <!-- <span class="animate-bounce inline-block" style="animation-duration: 3s;"> -->
+      <img src="/purin2.png" alt="Pompompurin" class="w-32 h-32 md:w-36 md:h-36 drop-shadow-lg" />
+    </span>
+  </div>
 
   <form
-    id="<%= formId %>"
     method="post"
-    action="/events/<%= event.id %>/rsvp/toggle"
     hx-post="/events/<%= event.id %>/rsvp/toggle"
     hx-target="#<%= panelId %>"
     hx-swap="outerHTML"
+    @submit="processing = true"
   >
     <button
       type="submit"
-      class="px-4 py-2.5 rounded-lg font-medium cursor-pointer text-sm
-        <%= isActive
-          ? 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-          : 'bg-blue-600 text-white hover:bg-blue-700' %>"
+      :disabled="processing"
+      class="w-full sm:w-auto px-6 py-3 rounded-2xl font-black text-sm border-1 transition-all duration-200 active:transform active:scale-95 disabled:cursor-not-allowed
+        <%= currentState.classes %>"
     >
-      <%= buttonLabel %>
+      <span x-show="!processing" x-transition.scale.origin.left>
+        <%= currentState.label %>
+      </span>
+      <span x-show="processing" x-cloak class="flex items-center gap-2">
+        <svg class="animate-spin h-4 w-4 text-current" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        Processing...
+      </span>
     </button>
   </form>
 </section>
